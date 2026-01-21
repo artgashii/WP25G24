@@ -18,6 +18,7 @@
                 <select asp-for="EventId" class="form-control" asp-items="ViewBag.EventId"></select>
                 <span asp-validation-for="EventId" class="text-danger"></span>
             </div>
+
             <div class="form-group">
                 <label asp-for="Price" class="control-label"></label>
                 <input asp-for="Price" class="form-control" />
@@ -25,9 +26,10 @@
             </div>
             <div class="form-group">
                 <label asp-for="Status" class="control-label"></label>
-                <select asp-for="Status" class="form-control"></select>
+                <select asp-for="Status" class="form-control" asp-items="ViewBag.Status"></select>
                 <span asp-validation-for="Status" class="text-danger"></span>
             </div>
+
             <div class="form-group">
                 <label asp-for="PurchasedByUserId" class="control-label"></label>
                 <input asp-for="PurchasedByUserId" class="form-control" />

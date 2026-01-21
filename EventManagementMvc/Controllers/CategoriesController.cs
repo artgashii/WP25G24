@@ -22,7 +22,13 @@ namespace EventManagementMvc.Controllers
         // GET: Categories
         public async Task<IActionResult> Index()
         {
-            return View(await _context.Categories.ToListAsync());
+            var isAdmin = User.IsInRole("Admin");
+            var query = _context.Categories.AsQueryable();
+
+            if (!isAdmin)
+                query = query.Where(c => c.IsActive);
+
+            return View(await query.ToListAsync());
         }
 
         // GET: Categories/Details/5

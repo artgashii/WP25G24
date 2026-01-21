@@ -22,9 +22,17 @@ namespace EventManagementMvc.Controllers
         // GET: Tickets
         public async Task<IActionResult> Index()
         {
-            var applicationDbContext = _context.Tickets.Include(t => t.Event);
-            return View(await applicationDbContext.ToListAsync());
+            var isAdmin = User.IsInRole("Admin");
+
+            IQueryable<Ticket> query =
+                _context.Tickets.Include(t => t.Event);
+
+            if (!isAdmin)
+                query = query.Where(t => t.IsActive);
+
+            return View(await query.ToListAsync());
         }
+
 
         // GET: Tickets/Details/5
         public async Task<IActionResult> Details(int? id)
@@ -48,7 +56,8 @@ namespace EventManagementMvc.Controllers
         // GET: Tickets/Create
         public IActionResult Create()
         {
-            ViewData["EventId"] = new SelectList(_context.Events, "Id", "CreatedByUserId");
+            ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name");
+            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(EventManagementMvc.Models.TicketStatus)));
             return View();
         }
 
@@ -65,7 +74,8 @@ namespace EventManagementMvc.Controllers
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["EventId"] = new SelectList(_context.Events, "Id", "CreatedByUserId", ticket.EventId);
+            ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name", ticket.EventId);
+            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(EventManagementMvc.Models.TicketStatus)), ticket.Status);
             return View(ticket);
         }
 
@@ -82,7 +92,8 @@ namespace EventManagementMvc.Controllers
             {
                 return NotFound();
             }
-            ViewData["EventId"] = new SelectList(_context.Events, "Id", "CreatedByUserId", ticket.EventId);
+            ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name", ticket.EventId);
+            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(EventManagementMvc.Models.TicketStatus)), ticket.Status);
             return View(ticket);
         }
 

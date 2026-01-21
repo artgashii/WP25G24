@@ -22,9 +22,17 @@ namespace EventManagementMvc.Controllers
         // GET: Events
         public async Task<IActionResult> Index()
         {
-            var applicationDbContext = _context.Events.Include(e => e.Category);
-            return View(await applicationDbContext.ToListAsync());
+            var isAdmin = User.IsInRole("Admin");
+
+            IQueryable<Event> query =
+                _context.Events.Include(e => e.Category);
+
+            if (!isAdmin)
+                query = query.Where(e => e.IsActive);
+
+            return View(await query.ToListAsync());
         }
+
 
         // GET: Events/Details/5
         public async Task<IActionResult> Details(int? id)
