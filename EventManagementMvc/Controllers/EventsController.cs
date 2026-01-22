@@ -1,15 +1,13 @@
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
+using EventManagementMvc.Models.ViewModels;
+using EventManagementMvc.Areas.Identity.Data;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using EventManagementMvc.Areas.Identity.Data;
-using Microsoft.AspNetCore.Identity;
-using EventManagementMvc.Models.ViewModels;
-
-
 
 namespace EventManagementMvc.Controllers
 {
@@ -17,7 +15,6 @@ namespace EventManagementMvc.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UserManager<EventManagementMvcUser> _userManager;
-
 
         public EventsController(ApplicationDbContext context, UserManager<EventManagementMvcUser> userManager)
         {
@@ -47,18 +44,17 @@ namespace EventManagementMvc.Controllers
                 .Include(e => e.Category)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
-            if (@event == null)
-            {
-                return NotFound();
-            }
+            if (@event == null) return NotFound();
 
+            // If inactive, only Admin can view details
             if (!@event.IsActive && !User.IsInRole("Admin"))
-            {
                 return NotFound();
-            }
+
+            // Permission-based view enforcement
+            if (!await CanViewEventAsync(@event))
+                return Forbid();
 
             return View(@event);
-
         }
 
         // GET: Events/Create
@@ -75,10 +71,7 @@ namespace EventManagementMvc.Controllers
         [Authorize]
         public async Task<IActionResult> Create([Bind("Id,Name,Description,Date,Location,ImagePath,IsActive,CategoryId")] Event @event)
         {
-            // Set owner from the logged-in user
             @event.CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
-
-            // Remove model validation error for this field (since it's not in the form)
             ModelState.Remove("CreatedByUserId");
 
             if (ModelState.IsValid)
@@ -101,7 +94,7 @@ namespace EventManagementMvc.Controllers
             var @event = await _context.Events.FindAsync(id);
             if (@event == null) return NotFound();
 
-            if (!IsOwnerOrAdmin(@event))
+            if (!await CanEditEventAsync(@event))
                 return Forbid();
 
             ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", @event.CategoryId);
@@ -116,18 +109,13 @@ namespace EventManagementMvc.Controllers
         {
             if (id != editedEvent.Id) return NotFound();
 
-            // Load original from DB
             var existingEvent = await _context.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == id);
             if (existingEvent == null) return NotFound();
 
-            // Ownership check
-            if (!IsOwnerOrAdmin(existingEvent))
+            if (!await CanEditEventAsync(existingEvent))
                 return Forbid();
 
-            // Preserve owner (never trust client for this)
             editedEvent.CreatedByUserId = existingEvent.CreatedByUserId;
-
-            // Remove validation error because it's not on the form
             ModelState.Remove("CreatedByUserId");
 
             if (!ModelState.IsValid)
@@ -150,7 +138,6 @@ namespace EventManagementMvc.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-
         // GET: Events/Delete/5
         [Authorize]
         public async Task<IActionResult> Delete(int? id)
@@ -163,7 +150,7 @@ namespace EventManagementMvc.Controllers
 
             if (@event == null) return NotFound();
 
-            if (!IsOwnerOrAdmin(@event))
+            if (!await CanEditEventAsync(@event))
                 return Forbid();
 
             return View(@event);
@@ -178,7 +165,7 @@ namespace EventManagementMvc.Controllers
             var @event = await _context.Events.FindAsync(id);
             if (@event == null) return NotFound();
 
-            if (!IsOwnerOrAdmin(@event))
+            if (!await CanEditEventAsync(@event))
                 return Forbid();
 
             _context.Events.Remove(@event);
@@ -203,6 +190,7 @@ namespace EventManagementMvc.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // ADMIN: Manage per-event permissions
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Permissions(int id)
         {
@@ -237,9 +225,7 @@ namespace EventManagementMvc.Controllers
             if (ev == null) return NotFound();
 
             if (string.IsNullOrWhiteSpace(vm.SelectedUserId))
-            {
                 ModelState.AddModelError(nameof(vm.SelectedUserId), "Please select a user.");
-            }
 
             if (!ModelState.IsValid)
             {
@@ -281,18 +267,44 @@ namespace EventManagementMvc.Controllers
             return RedirectToAction(nameof(Permissions), new { id = vm.EventId });
         }
 
-
-        private bool IsOwnerOrAdmin(Event ev)
-        {
-            if (User.IsInRole("Admin")) return true;
-
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            return userId != null && ev.CreatedByUserId == userId;
-        }
-
         private bool EventExists(int id)
         {
             return _context.Events.Any(e => e.Id == id);
         }
+
+        private async Task<bool> HasEventPermissionAsync(int eventId, string userId, bool requireEdit)
+        {
+            var p = await _context.EventPermissions
+                .FirstOrDefaultAsync(x => x.EventId == eventId && x.UserId == userId);
+
+            if (p == null) return false;
+
+            return requireEdit ? p.CanEdit : p.CanView;
+        }
+
+        private async Task<bool> CanViewEventAsync(Event ev)
+        {
+            if (User.IsInRole("Admin")) return true;
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return false;
+
+            if (ev.CreatedByUserId == userId) return true;
+
+            return await HasEventPermissionAsync(ev.Id, userId, requireEdit: false);
+        }
+
+        private async Task<bool> CanEditEventAsync(Event ev)
+        {
+            if (User.IsInRole("Admin")) return true;
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null) return false;
+
+            if (ev.CreatedByUserId == userId) return true;
+
+            return await HasEventPermissionAsync(ev.Id, userId, requireEdit: true);
+        }
     }
 }
+ 

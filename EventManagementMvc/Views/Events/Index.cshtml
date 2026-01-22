@@ -87,6 +87,14 @@
                         <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
                     }
                 </td>
+                <td>
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <span> | </span>
+                        <a asp-action="Permissions" asp-route-id="@item.Id">Permissions</a>
+                    }
+
+                </td>
 
         </tr>
 }
