@@ -171,5 +171,22 @@ namespace EventManagementMvc.Controllers
         {
             return _context.Tickets.Any(e => e.Id == id);
         }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ToggleActive(int id)
+        {
+            if (!User.IsInRole("Admin"))
+                return Forbid();
+
+            var ticket = await _context.Tickets.FindAsync(id);
+            if (ticket == null)
+                return NotFound();
+
+            ticket.IsActive = !ticket.IsActive;
+            await _context.SaveChangesAsync();
+
+            return RedirectToAction(nameof(Index));
+        }
+
     }
 }

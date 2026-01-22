@@ -27,9 +27,8 @@
             <th>
                 @Html.DisplayNameFor(model => model.ImagePath)
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.IsActive)
-            </th>
+            <th>Status</th>
+
             <th>
                 @Html.DisplayNameFor(model => model.Category)
             </th>
@@ -57,9 +56,20 @@
             <td>
                 @Html.DisplayFor(modelItem => item.ImagePath)
             </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.IsActive)
-            </td>
+                <td>
+                    @(item.IsActive ? "Active" : "Inactive")
+
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <form asp-action="ToggleActive" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">
+                                @(item.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </form>
+                    }
+                </td>
             <td>
                 @Html.DisplayFor(modelItem => item.Category.Name)
             </td>

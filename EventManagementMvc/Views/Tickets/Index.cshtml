@@ -24,9 +24,8 @@
             <th>
                 @Html.DisplayNameFor(model => model.PurchasedByUserId)
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.IsActive)
-            </th>
+            <th>Status</th>
+
             <th></th>
         </tr>
     </thead>
@@ -45,9 +44,21 @@
             <td>
                 @Html.DisplayFor(modelItem => item.PurchasedByUserId)
             </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.IsActive)
-            </td>
+                <td>
+                    @(item.IsActive ? "Active" : "Inactive")
+
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <form asp-action="ToggleActive" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">
+                                @(item.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </form>
+                    }
+                </td>
+
             <td>
                 <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
                 <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
