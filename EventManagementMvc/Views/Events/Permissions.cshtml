@@ -1,0 +1,35 @@
+﻿@model EventManagementMvc.Models.ViewModels.EventPermissionsViewModel
+
+@{
+    ViewData["Title"] = "Event Permissions";
+}
+
+<h1>Event Permissions</h1>
+
+<p><strong>Event:</strong> @Model.EventName (ID: @Model.EventId)</p>
+
+<form asp-action="Permissions" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="EventId" />
+
+    <div class="mb-3">
+        <label class="form-label">User</label>
+        <select asp-for="SelectedUserId" class="form-select" asp-items="Model.Users">
+            <option value="">-- Select user --</option>
+        </select>
+        <span asp-validation-for="SelectedUserId" class="text-danger"></span>
+    </div>
+
+    <div class="form-check mb-2">
+        <input class="form-check-input" asp-for="CanView" />
+        <label class="form-check-label" asp-for="CanView">Can view this event</label>
+    </div>
+
+    <div class="form-check mb-3">
+        <input class="form-check-input" asp-for="CanEdit" />
+        <label class="form-check-label" asp-for="CanEdit">Can edit this event</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save Permission</button>
+    <a asp-action="Index" class="btn btn-secondary ms-2">Back</a>
+</form>

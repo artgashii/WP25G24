@@ -3,6 +3,7 @@ using EventManagementMvc.Areas.Identity.Data;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
+
 namespace EventManagementMvc.Data
 {
     public class ApplicationDbContext : IdentityDbContext<EventManagementMvcUser>
@@ -14,5 +15,7 @@ namespace EventManagementMvc.Data
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Event> Events => Set<Event>();
         public DbSet<Ticket> Tickets => Set<Ticket>();
+        public DbSet<EventPermission> EventPermissions { get; set; } = default!;
+
     }
 }
