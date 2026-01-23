@@ -4,5 +4,18 @@
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
+    @{
+        var lastId = Context.Session.GetInt32("LastViewedEventId");
+        var lastName = Context.Session.GetString("LastViewedEventName");
+    }
+
+    @if (lastId != null)
+    {
+        <div class="alert alert-info">
+            Last viewed event:
+            <a href="/Events/Details/@lastId">@lastName</a>
+        </div>
+    }
+
     <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>

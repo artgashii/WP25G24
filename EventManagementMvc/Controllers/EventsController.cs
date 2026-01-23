@@ -1,25 +1,32 @@
+using EventManagementMvc.Areas.Identity.Data;
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
+using EventManagementMvc.Models.Dto;
 using EventManagementMvc.Models.ViewModels;
-using EventManagementMvc.Areas.Identity.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Http.Json;
 using System.Security.Claims;
 
 namespace EventManagementMvc.Controllers
 {
     public class EventsController : Controller
     {
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly ApplicationDbContext _context;
         private readonly UserManager<EventManagementMvcUser> _userManager;
 
-        public EventsController(ApplicationDbContext context, UserManager<EventManagementMvcUser> userManager)
+        public EventsController(
+            ApplicationDbContext context,
+            UserManager<EventManagementMvcUser> userManager,
+            IHttpClientFactory httpClientFactory)
         {
             _context = context;
             _userManager = userManager;
+            _httpClientFactory = httpClientFactory;
         }
 
         // GET: Events
@@ -27,12 +34,42 @@ namespace EventManagementMvc.Controllers
         {
             var isAdmin = User.IsInRole("Admin");
 
-            IQueryable<Event> query = _context.Events.Include(e => e.Category);
+            // Admin: use DB (see all, includes Category navigation, includes inactive)
+            if (isAdmin)
+            {
+                var adminEvents = await _context.Events
+                    .Include(e => e.Category)
+                    .ToListAsync();
 
-            if (!isAdmin)
-                query = query.Where(e => e.IsActive);
+                return View(adminEvents);
+            }
 
-            return View(await query.ToListAsync());
+            // Everyone else: use API (active only)
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
+
+            var apiUrl = "/api/events";
+            var apiEvents = await client.GetFromJsonAsync<List<EventListItemDto>>(apiUrl) ?? new();
+
+            // Map DTO -> Event for existing MVC view
+            var events = apiEvents.Select(e => new Event
+            {
+                Id = e.Id,
+                Name = e.Name ?? "",
+                Description = e.Description,
+                Date = e.Date,
+                Location = e.Location,
+                ImagePath = e.ImagePath,
+                IsActive = e.IsActive,
+                CategoryId = e.CategoryId,
+                Category = new Category
+                {
+                    Id = e.CategoryId,
+                    Name = e.CategoryName ?? ""
+                }
+            }).ToList();
+
+            return View(events);
         }
 
         // GET: Events/Details/5
@@ -54,6 +91,9 @@ namespace EventManagementMvc.Controllers
             if (!await CanViewEventAsync(@event))
                 return Forbid();
 
+            HttpContext.Session.SetInt32("LastViewedEventId", @event.Id);
+            HttpContext.Session.SetString("LastViewedEventName", @event.Name ?? "");
+
             return View(@event);
         }
 
@@ -65,7 +105,7 @@ namespace EventManagementMvc.Controllers
             return View();
         }
 
-        // POST: Events/Create
+        // POST: Events/Create  (Admin uses API POST)
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -76,8 +116,28 @@ namespace EventManagementMvc.Controllers
 
             if (ModelState.IsValid)
             {
-                _context.Add(@event);
-                await _context.SaveChangesAsync();
+                var client = _httpClientFactory.CreateClient();
+                client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
+
+                // Forward auth cookie so API sees you as logged in
+                if (Request.Headers.TryGetValue("Cookie", out var cookie))
+                {
+                    client.DefaultRequestHeaders.Remove("Cookie");
+                    client.DefaultRequestHeaders.Add("Cookie", cookie.ToString());
+                }
+
+                var apiUrl = "/api/events";
+                var response = await client.PostAsJsonAsync(apiUrl, @event);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
+
+                    ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", @event.CategoryId);
+                    return View(@event);
+                }
+
                 return RedirectToAction(nameof(Index));
             }
 
@@ -101,7 +161,7 @@ namespace EventManagementMvc.Controllers
             return View(@event);
         }
 
-        // POST: Events/Edit/5
+        // POST: Events/Edit/5  (Admin uses API PUT)
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -115,6 +175,7 @@ namespace EventManagementMvc.Controllers
             if (!await CanEditEventAsync(existingEvent))
                 return Forbid();
 
+            // Preserve owner (never trust client)
             editedEvent.CreatedByUserId = existingEvent.CreatedByUserId;
             ModelState.Remove("CreatedByUserId");
 
@@ -124,15 +185,26 @@ namespace EventManagementMvc.Controllers
                 return View(editedEvent);
             }
 
-            try
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
+
+            // Forward auth cookie so API sees you as logged in
+            if (Request.Headers.TryGetValue("Cookie", out var cookie))
             {
-                _context.Update(editedEvent);
-                await _context.SaveChangesAsync();
+                client.DefaultRequestHeaders.Remove("Cookie");
+                client.DefaultRequestHeaders.Add("Cookie", cookie.ToString());
             }
-            catch (DbUpdateConcurrencyException)
+
+            var apiUrl = $"/api/events/{id}";
+            var response = await client.PutAsJsonAsync(apiUrl, editedEvent);
+
+            if (!response.IsSuccessStatusCode)
             {
-                if (!EventExists(editedEvent.Id)) return NotFound();
-                throw;
+                var body = await response.Content.ReadAsStringAsync();
+                ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
+
+                ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", editedEvent.CategoryId);
+                return View(editedEvent);
             }
 
             return RedirectToAction(nameof(Index));
@@ -156,7 +228,7 @@ namespace EventManagementMvc.Controllers
             return View(@event);
         }
 
-        // POST: Events/Delete/5
+        // POST: Events/Delete/5  (Admin uses API DELETE)
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -168,8 +240,30 @@ namespace EventManagementMvc.Controllers
             if (!await CanEditEventAsync(@event))
                 return Forbid();
 
-            _context.Events.Remove(@event);
-            await _context.SaveChangesAsync();
+            var client = _httpClientFactory.CreateClient();
+            client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
+
+            // Forward auth cookie so API sees you as logged in
+            if (Request.Headers.TryGetValue("Cookie", out var cookie))
+            {
+                client.DefaultRequestHeaders.Remove("Cookie");
+                client.DefaultRequestHeaders.Add("Cookie", cookie.ToString());
+            }
+
+            var apiUrl = $"/api/events/{id}";
+            var response = await client.DeleteAsync(apiUrl);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
+
+                // re-show delete view with event loaded (simple fallback)
+                var fullEvent = await _context.Events.Include(e => e.Category).FirstOrDefaultAsync(e => e.Id == id);
+                if (fullEvent == null) return RedirectToAction(nameof(Index));
+                return View("Delete", fullEvent);
+            }
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -263,7 +357,6 @@ namespace EventManagementMvc.Controllers
             }
 
             await _context.SaveChangesAsync();
-
             return RedirectToAction(nameof(Permissions), new { id = vm.EventId });
         }
 
@@ -284,8 +377,13 @@ namespace EventManagementMvc.Controllers
 
         private async Task<bool> CanViewEventAsync(Event ev)
         {
+            // Public rule: Active events are viewable by everyone
+            if (ev.IsActive) return true;
+
+            // Inactive: Admin can view
             if (User.IsInRole("Admin")) return true;
 
+            // Inactive: must be logged in (owner or granted CanView)
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId == null) return false;
 
@@ -307,4 +405,3 @@ namespace EventManagementMvc.Controllers
         }
     }
 }
- 
