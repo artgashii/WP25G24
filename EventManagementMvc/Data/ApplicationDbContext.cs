@@ -16,6 +16,7 @@ namespace EventManagementMvc.Data
         public DbSet<Event> Events => Set<Event>();
         public DbSet<Ticket> Tickets => Set<Ticket>();
         public DbSet<EventPermission> EventPermissions { get; set; } = default!;
+        public DbSet<EventManagementMvc.Models.LogEntry> LogEntries => Set<EventManagementMvc.Models.LogEntry>();
 
     }
 }
