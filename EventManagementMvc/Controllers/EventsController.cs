@@ -82,8 +82,12 @@ namespace EventManagementMvc.Controllers
                 .Take(pageSize)
                 .ToListAsync();
 
-            ViewBag.Categories = await _context.Categories
-                .AsNoTracking()
+            
+            var categoriesQuery = _context.Categories.AsNoTracking();
+            if (!isAdmin)
+                categoriesQuery = categoriesQuery.Where(c => c.IsActive);
+
+            ViewBag.Categories = await categoriesQuery
                 .OrderBy(c => c.Name)
                 .ToListAsync();
 
@@ -99,8 +103,7 @@ namespace EventManagementMvc.Controllers
             return View(items);
         }
 
-
-        // GET: Events/Details/5
+        
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null) return NotFound();
@@ -111,11 +114,11 @@ namespace EventManagementMvc.Controllers
 
             if (@event == null) return NotFound();
 
-            // If inactive, only Admin can view details
+            
             if (!@event.IsActive && !User.IsInRole("Admin"))
                 return NotFound();
 
-            // Permission-based view enforcement
+            
             if (!await CanViewEventAsync(@event))
                 return Forbid();
 
@@ -125,15 +128,25 @@ namespace EventManagementMvc.Controllers
             return View(@event);
         }
 
-        // GET: Events/Create
+        
         [Authorize]
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name");
+           
+            var categoriesQuery = _context.Categories.AsNoTracking();
+            if (!User.IsInRole("Admin"))
+                categoriesQuery = categoriesQuery.Where(c => c.IsActive);
+
+            ViewData["CategoryId"] = new SelectList(
+                await categoriesQuery.OrderBy(c => c.Name).ToListAsync(),
+                "Id",
+                "Name"
+            );
+
             return View();
         }
 
-        // POST: Events/Create  (Admin uses API POST)
+        
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -147,7 +160,7 @@ namespace EventManagementMvc.Controllers
                 var client = _httpClientFactory.CreateClient();
                 client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
-                // Forward auth cookie so API sees you as logged in
+                
                 if (Request.Headers.TryGetValue("Cookie", out var cookie))
                 {
                     client.DefaultRequestHeaders.Remove("Cookie");
@@ -162,18 +175,40 @@ namespace EventManagementMvc.Controllers
                     var body = await response.Content.ReadAsStringAsync();
                     ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
 
-                    ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", @event.CategoryId);
+                    
+                    var categoriesQuery = _context.Categories.AsNoTracking();
+                    if (!User.IsInRole("Admin"))
+                        categoriesQuery = categoriesQuery.Where(c => c.IsActive);
+
+                    ViewData["CategoryId"] = new SelectList(
+                        await categoriesQuery.OrderBy(c => c.Name).ToListAsync(),
+                        "Id",
+                        "Name",
+                        @event.CategoryId
+                    );
+
                     return View(@event);
                 }
 
                 return RedirectToAction(nameof(Index));
             }
 
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", @event.CategoryId);
+            
+            var categoriesQuery2 = _context.Categories.AsNoTracking();
+            if (!User.IsInRole("Admin"))
+                categoriesQuery2 = categoriesQuery2.Where(c => c.IsActive);
+
+            ViewData["CategoryId"] = new SelectList(
+                await categoriesQuery2.OrderBy(c => c.Name).ToListAsync(),
+                "Id",
+                "Name",
+                @event.CategoryId
+            );
+
             return View(@event);
         }
 
-        // GET: Events/Edit/5
+        
         [Authorize]
         public async Task<IActionResult> Edit(int? id)
         {
@@ -185,11 +220,22 @@ namespace EventManagementMvc.Controllers
             if (!await CanEditEventAsync(@event))
                 return Forbid();
 
-            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", @event.CategoryId);
+            
+            var categoriesQuery = _context.Categories.AsNoTracking();
+            if (!User.IsInRole("Admin"))
+                categoriesQuery = categoriesQuery.Where(c => c.IsActive);
+
+            ViewData["CategoryId"] = new SelectList(
+                await categoriesQuery.OrderBy(c => c.Name).ToListAsync(),
+                "Id",
+                "Name",
+                @event.CategoryId
+            );
+
             return View(@event);
         }
 
-        // POST: Events/Edit/5  (Admin uses API PUT)
+        
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -203,20 +249,31 @@ namespace EventManagementMvc.Controllers
             if (!await CanEditEventAsync(existingEvent))
                 return Forbid();
 
-            // Preserve owner (never trust client)
+           
             editedEvent.CreatedByUserId = existingEvent.CreatedByUserId;
             ModelState.Remove("CreatedByUserId");
 
             if (!ModelState.IsValid)
             {
-                ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", editedEvent.CategoryId);
+                
+                var categoriesQuery = _context.Categories.AsNoTracking();
+                if (!User.IsInRole("Admin"))
+                    categoriesQuery = categoriesQuery.Where(c => c.IsActive);
+
+                ViewData["CategoryId"] = new SelectList(
+                    await categoriesQuery.OrderBy(c => c.Name).ToListAsync(),
+                    "Id",
+                    "Name",
+                    editedEvent.CategoryId
+                );
+
                 return View(editedEvent);
             }
 
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
-            // Forward auth cookie so API sees you as logged in
+            
             if (Request.Headers.TryGetValue("Cookie", out var cookie))
             {
                 client.DefaultRequestHeaders.Remove("Cookie");
@@ -231,14 +288,24 @@ namespace EventManagementMvc.Controllers
                 var body = await response.Content.ReadAsStringAsync();
                 ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
 
-                ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", editedEvent.CategoryId);
+                var categoriesQuery = _context.Categories.AsNoTracking();
+                if (!User.IsInRole("Admin"))
+                    categoriesQuery = categoriesQuery.Where(c => c.IsActive);
+
+                ViewData["CategoryId"] = new SelectList(
+                    await categoriesQuery.OrderBy(c => c.Name).ToListAsync(),
+                    "Id",
+                    "Name",
+                    editedEvent.CategoryId
+                );
+
                 return View(editedEvent);
             }
 
             return RedirectToAction(nameof(Index));
         }
 
-        // GET: Events/Delete/5
+        
         [Authorize]
         public async Task<IActionResult> Delete(int? id)
         {
@@ -256,7 +323,6 @@ namespace EventManagementMvc.Controllers
             return View(@event);
         }
 
-        // POST: Events/Delete/5  (Admin uses API DELETE)
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -271,7 +337,7 @@ namespace EventManagementMvc.Controllers
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
-            // Forward auth cookie so API sees you as logged in
+            
             if (Request.Headers.TryGetValue("Cookie", out var cookie))
             {
                 client.DefaultRequestHeaders.Remove("Cookie");
@@ -286,7 +352,7 @@ namespace EventManagementMvc.Controllers
                 var body = await response.Content.ReadAsStringAsync();
                 ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
 
-                // re-show delete view with event loaded (simple fallback)
+               
                 var fullEvent = await _context.Events.Include(e => e.Category).FirstOrDefaultAsync(e => e.Id == id);
                 if (fullEvent == null) return RedirectToAction(nameof(Index));
                 return View("Delete", fullEvent);
@@ -312,7 +378,7 @@ namespace EventManagementMvc.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // ADMIN: Manage per-event permissions
+       
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Permissions(int id)
         {
@@ -405,13 +471,13 @@ namespace EventManagementMvc.Controllers
 
         private async Task<bool> CanViewEventAsync(Event ev)
         {
-            // Public rule: Active events are viewable by everyone
+            
             if (ev.IsActive) return true;
 
-            // Inactive: Admin can view
+            
             if (User.IsInRole("Admin")) return true;
 
-            // Inactive: must be logged in (owner or granted CanView)
+            
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId == null) return false;
 

@@ -1,3 +1,4 @@
+@using System.Security.Claims
 @model IEnumerable<EventManagementMvc.Models.Event>
 
 @{
@@ -20,6 +21,10 @@
     string NextDir(string col) => (sort == col && dir == "asc") ? "desc" : "asc";
 
     var categories = ViewBag.Categories as List<EventManagementMvc.Models.Category> ?? new();
+
+    var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    bool isAdmin = User.IsInRole("Admin");
+    bool isLoggedIn = User.Identity?.IsAuthenticated ?? false;
 }
 
 <h1>Events</h1>
@@ -40,7 +45,7 @@
         </select>
     </div>
 
-    @if (User.IsInRole("Admin"))
+    @if (isAdmin)
     {
         <div class="col-md-2 d-flex align-items-center">
             <div class="form-check">
@@ -48,6 +53,12 @@
                        @(activeOnly ? "checked" : "") />
                 <label class="form-check-label" for="activeOnly">Active only</label>
             </div>
+        </div>
+    }
+    else
+    {
+        <div class="col-md-2 d-flex align-items-center">
+            <span class="text-muted small">Showing active events only</span>
         </div>
     }
 
@@ -65,9 +76,12 @@
     </div>
 </form>
 
-<p>
-    <a asp-action="Create">Create New</a>
-</p>
+@if (isLoggedIn)
+{
+    <p>
+        <a asp-action="Create">Create New</a>
+    </p>
+}
 
 <p class="text-muted">
     Total: <strong>@total</strong> | Page <strong>@currentPage</strong> of <strong>@totalPages</strong>
@@ -82,7 +96,7 @@
                    asp-route-pageSize="@pageSize"
                    asp-route-q="@q"
                    asp-route-categoryId="@categoryId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(isAdmin && activeOnly ? "true" : null)"
                    asp-route-sort="Name"
                    asp-route-dir="@NextDir("Name")">
                     Name
@@ -95,7 +109,7 @@
                    asp-route-pageSize="@pageSize"
                    asp-route-q="@q"
                    asp-route-categoryId="@categoryId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(isAdmin && activeOnly ? "true" : null)"
                    asp-route-sort="Date"
                    asp-route-dir="@NextDir("Date")">
                     Date
@@ -110,7 +124,7 @@
                    asp-route-pageSize="@pageSize"
                    asp-route-q="@q"
                    asp-route-categoryId="@categoryId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(isAdmin && activeOnly ? "true" : null)"
                    asp-route-sort="Category"
                    asp-route-dir="@NextDir("Category")">
                     Category
@@ -120,9 +134,12 @@
             <th></th>
         </tr>
     </thead>
+
     <tbody>
         @foreach (var item in Model)
         {
+            bool canEdit = isAdmin || (!string.IsNullOrEmpty(currentUserId) && item.CreatedByUserId == currentUserId);
+
             <tr>
                 <td>@item.Name</td>
                 <td>@item.Description</td>
@@ -134,10 +151,26 @@
                 <td>@item.CreatedByUserId</td>
                 <td>
                     <a asp-action="Details" asp-route-id="@item.Id">Details</a>
-                    |
-                    <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
-                    |
-                    <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+
+                    @if (canEdit)
+                    {
+                        <text> | </text>
+                        <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                        <text> | </text>
+                        <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                    }
+
+                    @if (isAdmin)
+                    {
+                        <text> | </text>
+                        <form asp-action="ToggleActive" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-outline-warning" : "btn-outline-success")">
+                                @(item.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </form>
+                    }
                 </td>
             </tr>
         }
@@ -153,7 +186,7 @@
                asp-route-pageSize="@pageSize"
                asp-route-q="@q"
                asp-route-categoryId="@categoryId"
-               asp-route-activeOnly="@(activeOnly ? "true" : null)"
+               asp-route-activeOnly="@(isAdmin && activeOnly ? "true" : null)"
                asp-route-sort="@sort"
                asp-route-dir="@dir">Previous</a>
         </li>
@@ -169,7 +202,7 @@
                asp-route-pageSize="@pageSize"
                asp-route-q="@q"
                asp-route-categoryId="@categoryId"
-               asp-route-activeOnly="@(activeOnly ? "true" : null)"
+               asp-route-activeOnly="@(isAdmin && activeOnly ? "true" : null)"
                asp-route-sort="@sort"
                asp-route-dir="@dir">Next</a>
         </li>
