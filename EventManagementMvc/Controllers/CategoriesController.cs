@@ -66,6 +66,13 @@ namespace EventManagementMvc.Controllers
             ViewBag.Sort = sort;
             ViewBag.Dir = dir;
 
+            await _audit.LogAsync(
+                action: "CategoriesListed",
+                entityType: "Category",
+                entityId: null,
+                details: $"Page={page}; PageSize={pageSize}; Q={(q ?? "")}; Sort={sort}; Dir={dir}; Total={total}"
+            );
+
             return View(items);
         }
 
@@ -80,24 +87,29 @@ namespace EventManagementMvc.Controllers
             if (category == null)
                 return NotFound();
 
-            
             if (!User.IsInRole("Admin") && !category.IsActive)
                 return NotFound();
 
-            
             await _audit.LogAsync(
                 action: "CategoryViewed",
                 entityType: "Category",
                 entityId: category.Id,
-                details: $"Name={category.Name}"
+                details: $"Name={category.Name}; IsActive={category.IsActive}"
             );
 
             return View(category);
         }
 
         [Authorize(Roles = "Admin")]
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
+            await _audit.LogAsync(
+                action: "CategoryCreateFormOpened",
+                entityType: "Category",
+                entityId: null,
+                details: "Create GET"
+            );
+
             return View();
         }
 
@@ -110,6 +122,14 @@ namespace EventManagementMvc.Controllers
             {
                 _context.Add(category);
                 await _context.SaveChangesAsync();
+
+                await _audit.LogAsync(
+                    action: "CategoryCreated",
+                    entityType: "Category",
+                    entityId: category.Id,
+                    details: $"Name={category.Name}; IsActive={category.IsActive}"
+                );
+
                 return RedirectToAction(nameof(Index));
             }
             return View(category);
@@ -124,6 +144,13 @@ namespace EventManagementMvc.Controllers
             var category = await _context.Categories.FindAsync(id);
             if (category == null)
                 return NotFound();
+
+            await _audit.LogAsync(
+                action: "CategoryEditFormOpened",
+                entityType: "Category",
+                entityId: category.Id,
+                details: $"Name={category.Name}; IsActive={category.IsActive}"
+            );
 
             return View(category);
         }
@@ -142,6 +169,13 @@ namespace EventManagementMvc.Controllers
                 {
                     _context.Update(category);
                     await _context.SaveChangesAsync();
+
+                    await _audit.LogAsync(
+                        action: "CategoryUpdated",
+                        entityType: "Category",
+                        entityId: category.Id,
+                        details: $"Name={category.Name}; IsActive={category.IsActive}"
+                    );
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -167,6 +201,13 @@ namespace EventManagementMvc.Controllers
             if (category == null)
                 return NotFound();
 
+            await _audit.LogAsync(
+                action: "CategoryDeleteFormOpened",
+                entityType: "Category",
+                entityId: category.Id,
+                details: $"Name={category.Name}; IsActive={category.IsActive}"
+            );
+
             return View(category);
         }
 
@@ -176,10 +217,23 @@ namespace EventManagementMvc.Controllers
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var category = await _context.Categories.FindAsync(id);
+
+            string details = $"Id={id}";
             if (category != null)
+            {
+                details = $"Name={category.Name}; IsActive={category.IsActive}";
                 _context.Categories.Remove(category);
+            }
 
             await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(
+                action: "CategoryDeleted",
+                entityType: "Category",
+                entityId: id,
+                details: details
+            );
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -199,6 +253,13 @@ namespace EventManagementMvc.Controllers
 
             category.IsActive = !category.IsActive;
             await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(
+                action: "CategoryToggled",
+                entityType: "Category",
+                entityId: id,
+                details: $"Name={category.Name}; IsActive={category.IsActive}"
+            );
 
             return RedirectToAction(nameof(Index));
         }

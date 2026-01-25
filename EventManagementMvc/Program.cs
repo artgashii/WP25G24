@@ -1,7 +1,10 @@
-using EventManagementMvc.Data;
+﻿using EventManagementMvc.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using EventManagementMvc.Areas.Identity.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +21,27 @@ builder.Services.AddDefaultIdentity<EventManagementMvcUser>(options =>
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
+// ✅ JWT configuration
+var jwtKey = builder.Configuration["Jwt:Key"]!;
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
+var jwtAudience = builder.Configuration["Jwt:Audience"]!;
+
+builder.Services.AddAuthentication()
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
 builder.Services.AddDistributedMemoryCache();
 
 builder.Services.AddSession(options =>
@@ -30,7 +54,6 @@ builder.Services.AddSession(options =>
 builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
 builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransformation, EventManagementMvc.Services.RoleClaimTransformation>();
-
 builder.Services.AddScoped<EventManagementMvc.Services.IAuditLogger, EventManagementMvc.Services.AuditLogger>();
 
 var app = builder.Build();
@@ -63,10 +86,8 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-
 app.MapRazorPages();
 
 app.Run();
 
 public partial class Program { }
-

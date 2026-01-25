@@ -37,14 +37,12 @@ namespace EventManagementMvc.Controllers
             IQueryable<Ticket> query = _context.Tickets
                 .Include(t => t.Event);
 
-           
             if (!User.IsInRole("Admin"))
             {
                 query = query.Where(t => t.IsActive);
             }
             else
             {
-               
                 if (activeOnly.HasValue && activeOnly.Value)
                     query = query.Where(t => t.IsActive);
             }
@@ -88,11 +86,17 @@ namespace EventManagementMvc.Controllers
             ViewBag.Total = total;
             ViewBag.EventId = eventId ?? 0;
 
-            
             ViewBag.ActiveOnly = User.IsInRole("Admin") ? (activeOnly ?? false) : true;
 
             ViewBag.Sort = sort;
             ViewBag.Dir = dir;
+
+            await _audit.LogAsync(
+                action: "TicketsListed",
+                entityType: "Ticket",
+                entityId: null,
+                details: $"Page={page}; PageSize={pageSize}; EventId={(eventId ?? 0)}; ActiveOnly={(User.IsInRole("Admin") ? (activeOnly ?? false) : true)}; Sort={sort}; Dir={dir}; Total={total}"
+            );
 
             return View(items);
         }
@@ -109,7 +113,6 @@ namespace EventManagementMvc.Controllers
             if (ticket == null)
                 return NotFound();
 
-          
             if (!User.IsInRole("Admin") && !ticket.IsActive)
                 return NotFound();
 
@@ -117,15 +120,22 @@ namespace EventManagementMvc.Controllers
                 action: "TicketViewed",
                 entityType: "Ticket",
                 entityId: ticket.Id,
-                details: $"EventId={ticket.EventId}; Price={ticket.Price}; Status={ticket.Status}"
+                details: $"EventId={ticket.EventId}; Price={ticket.Price}; Status={ticket.Status}; IsActive={ticket.IsActive}"
             );
 
             return View(ticket);
         }
 
         [Authorize(Roles = "Admin")]
-        public IActionResult Create()
+        public async Task<IActionResult> Create()
         {
+            await _audit.LogAsync(
+                action: "TicketCreateFormOpened",
+                entityType: "Ticket",
+                entityId: null,
+                details: "Create GET"
+            );
+
             ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name");
             ViewData["Status"] = new SelectList(Enum.GetValues(typeof(TicketStatus)));
             return View();
@@ -140,6 +150,14 @@ namespace EventManagementMvc.Controllers
             {
                 _context.Add(ticket);
                 await _context.SaveChangesAsync();
+
+                await _audit.LogAsync(
+                    action: "TicketCreated",
+                    entityType: "Ticket",
+                    entityId: ticket.Id,
+                    details: $"EventId={ticket.EventId}; Price={ticket.Price}; Status={ticket.Status}; IsActive={ticket.IsActive}"
+                );
+
                 return RedirectToAction(nameof(Index));
             }
 
@@ -157,6 +175,13 @@ namespace EventManagementMvc.Controllers
             var ticket = await _context.Tickets.FindAsync(id);
             if (ticket == null)
                 return NotFound();
+
+            await _audit.LogAsync(
+                action: "TicketEditFormOpened",
+                entityType: "Ticket",
+                entityId: ticket.Id,
+                details: $"EventId={ticket.EventId}; IsActive={ticket.IsActive}"
+            );
 
             ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name", ticket.EventId);
             ViewData["Status"] = new SelectList(Enum.GetValues(typeof(TicketStatus)), ticket.Status);
@@ -177,6 +202,13 @@ namespace EventManagementMvc.Controllers
                 {
                     _context.Update(ticket);
                     await _context.SaveChangesAsync();
+
+                    await _audit.LogAsync(
+                        action: "TicketUpdated",
+                        entityType: "Ticket",
+                        entityId: ticket.Id,
+                        details: $"EventId={ticket.EventId}; Price={ticket.Price}; Status={ticket.Status}; IsActive={ticket.IsActive}"
+                    );
                 }
                 catch (DbUpdateConcurrencyException)
                 {
@@ -206,6 +238,13 @@ namespace EventManagementMvc.Controllers
             if (ticket == null)
                 return NotFound();
 
+            await _audit.LogAsync(
+                action: "TicketDeleteFormOpened",
+                entityType: "Ticket",
+                entityId: ticket.Id,
+                details: $"EventId={ticket.EventId}; Price={ticket.Price}; Status={ticket.Status}; IsActive={ticket.IsActive}"
+            );
+
             return View(ticket);
         }
 
@@ -215,10 +254,23 @@ namespace EventManagementMvc.Controllers
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var ticket = await _context.Tickets.FindAsync(id);
+
+            string details = $"Id={id}";
             if (ticket != null)
+            {
+                details = $"EventId={ticket.EventId}; Price={ticket.Price}; Status={ticket.Status}; IsActive={ticket.IsActive}";
                 _context.Tickets.Remove(ticket);
+            }
 
             await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(
+                action: "TicketDeleted",
+                entityType: "Ticket",
+                entityId: id,
+                details: details
+            );
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -238,6 +290,13 @@ namespace EventManagementMvc.Controllers
 
             ticket.IsActive = !ticket.IsActive;
             await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(
+                action: "TicketToggled",
+                entityType: "Ticket",
+                entityId: id,
+                details: $"EventId={ticket.EventId}; IsActive={ticket.IsActive}"
+            );
 
             return RedirectToAction(nameof(Index));
         }
