@@ -43,11 +43,19 @@
     </div>
 
     <div class="col-md-2 d-flex align-items-center">
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="activeOnly" name="activeOnly" value="true"
-                   @(activeOnly ? "checked" : "") />
-            <label class="form-check-label" for="activeOnly">Active only</label>
-        </div>
+        @* Only admins need the Active only checkbox; users already see active only *@
+        @if (User.IsInRole("Admin"))
+        {
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="activeOnly" name="activeOnly" value="true"
+                       @(activeOnly ? "checked" : "") />
+                <label class="form-check-label" for="activeOnly">Active only</label>
+            </div>
+        }
+        else
+        {
+            <span class="text-muted small">Showing active tickets only</span>
+        }
     </div>
 
     <div class="col-md-3">
@@ -63,9 +71,12 @@
     </div>
 </form>
 
-<p>
-    <a asp-action="Create">Create New</a>
-</p>
+@if (User.IsInRole("Admin"))
+{
+    <p>
+        <a asp-action="Create">Create New</a>
+    </p>
+}
 
 <p class="text-muted">
     Total: <strong>@total</strong> | Page <strong>@currentPage</strong> of <strong>@totalPages</strong>
@@ -79,7 +90,7 @@
                    asp-route-page="1"
                    asp-route-pageSize="@pageSize"
                    asp-route-eventId="@eventId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(User.IsInRole("Admin") && activeOnly ? "true" : null)"
                    asp-route-sort="Id"
                    asp-route-dir="@NextDir("Id")">Id</a>
             </th>
@@ -88,7 +99,7 @@
                    asp-route-page="1"
                    asp-route-pageSize="@pageSize"
                    asp-route-eventId="@eventId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(User.IsInRole("Admin") && activeOnly ? "true" : null)"
                    asp-route-sort="Event"
                    asp-route-dir="@NextDir("Event")">Event</a>
             </th>
@@ -97,7 +108,7 @@
                    asp-route-page="1"
                    asp-route-pageSize="@pageSize"
                    asp-route-eventId="@eventId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(User.IsInRole("Admin") && activeOnly ? "true" : null)"
                    asp-route-sort="Price"
                    asp-route-dir="@NextDir("Price")">Price</a>
             </th>
@@ -106,7 +117,7 @@
                    asp-route-page="1"
                    asp-route-pageSize="@pageSize"
                    asp-route-eventId="@eventId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(User.IsInRole("Admin") && activeOnly ? "true" : null)"
                    asp-route-sort="Status"
                    asp-route-dir="@NextDir("Status")">Status</a>
             </th>
@@ -116,13 +127,14 @@
                    asp-route-page="1"
                    asp-route-pageSize="@pageSize"
                    asp-route-eventId="@eventId"
-                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-activeOnly="@(User.IsInRole("Admin") && activeOnly ? "true" : null)"
                    asp-route-sort="IsActive"
                    asp-route-dir="@NextDir("IsActive")">IsActive</a>
             </th>
             <th></th>
         </tr>
     </thead>
+
     <tbody>
         @foreach (var item in Model)
         {
@@ -134,9 +146,24 @@
                 <td>@(item.PurchasedByUserId ?? "-")</td>
                 <td>@item.IsActive</td>
                 <td>
-                    <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
-                    <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
-                    <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                    <a asp-action="Details" asp-route-id="@item.Id">Details</a>
+
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <text> | </text>
+                        <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                        <text> | </text>
+                        <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+
+                        <text> | </text>
+                        <form asp-action="ToggleActive" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-outline-warning" : "btn-outline-success")">
+                                @(item.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </form>
+                    }
                 </td>
             </tr>
         }
@@ -151,7 +178,7 @@
                asp-route-page="@(currentPage - 1)"
                asp-route-pageSize="@pageSize"
                asp-route-eventId="@eventId"
-               asp-route-activeOnly="@(activeOnly ? "true" : null)"
+               asp-route-activeOnly="@(User.IsInRole("Admin") && activeOnly ? "true" : null)"
                asp-route-sort="@sort"
                asp-route-dir="@dir">Previous</a>
         </li>
@@ -166,7 +193,7 @@
                asp-route-page="@(currentPage + 1)"
                asp-route-pageSize="@pageSize"
                asp-route-eventId="@eventId"
-               asp-route-activeOnly="@(activeOnly ? "true" : null)"
+               asp-route-activeOnly="@(User.IsInRole("Admin") && activeOnly ? "true" : null)"
                asp-route-sort="@sort"
                asp-route-dir="@dir">Next</a>
         </li>

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace EventManagementMvc.Controllers
 {
@@ -20,12 +20,12 @@ namespace EventManagementMvc.Controllers
         }
 
         public async Task<IActionResult> Index(
-    int page = 1,
-    int pageSize = 10,
-    int? eventId = null,
-    bool? activeOnly = null,
-    string sort = "Id",
-    string dir = "asc")
+            int page = 1,
+            int pageSize = 10,
+            int? eventId = null,
+            bool? activeOnly = null,
+            string sort = "Id",
+            string dir = "asc")
         {
             if (page < 1) page = 1;
             if (pageSize < 5) pageSize = 5;
@@ -34,11 +34,20 @@ namespace EventManagementMvc.Controllers
             IQueryable<Ticket> query = _context.Tickets
                 .Include(t => t.Event);
 
+            // Non-admin users should only see active tickets (regardless of checkbox)
+            if (!User.IsInRole("Admin"))
+            {
+                query = query.Where(t => t.IsActive);
+            }
+            else
+            {
+                // Admin can optionally filter active only
+                if (activeOnly.HasValue && activeOnly.Value)
+                    query = query.Where(t => t.IsActive);
+            }
+
             if (eventId.HasValue && eventId.Value > 0)
                 query = query.Where(t => t.EventId == eventId.Value);
-
-            if (activeOnly.HasValue && activeOnly.Value)
-                query = query.Where(t => t.IsActive);
 
             bool asc = dir.Equals("asc", StringComparison.OrdinalIgnoreCase);
             query = (sort, asc) switch
@@ -75,41 +84,45 @@ namespace EventManagementMvc.Controllers
             ViewBag.PageSize = pageSize;
             ViewBag.Total = total;
             ViewBag.EventId = eventId ?? 0;
-            ViewBag.ActiveOnly = activeOnly ?? false;
+
+            // For non-admin, force checkbox false in UI because it’s redundant
+            ViewBag.ActiveOnly = User.IsInRole("Admin") ? (activeOnly ?? false) : true;
+
             ViewBag.Sort = sort;
             ViewBag.Dir = dir;
 
             return View(items);
         }
 
-
-
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
-            {
                 return NotFound();
-            }
 
             var ticket = await _context.Tickets
                 .Include(t => t.Event)
                 .FirstOrDefaultAsync(m => m.Id == id);
+
             if (ticket == null)
-            {
                 return NotFound();
-            }
+
+            // Non-admin users cannot view inactive tickets
+            if (!User.IsInRole("Admin") && !ticket.IsActive)
+                return NotFound();
 
             return View(ticket);
         }
 
+        [Authorize(Roles = "Admin")]
         public IActionResult Create()
         {
             ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name");
-            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(EventManagementMvc.Models.TicketStatus)));
+            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(TicketStatus)));
             return View();
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,EventId,Price,Status,PurchasedByUserId,IsActive")] Ticket ticket)
         {
@@ -119,36 +132,34 @@ namespace EventManagementMvc.Controllers
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
+
             ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name", ticket.EventId);
-            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(EventManagementMvc.Models.TicketStatus)), ticket.Status);
+            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(TicketStatus)), ticket.Status);
             return View(ticket);
         }
 
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
-            {
                 return NotFound();
-            }
 
             var ticket = await _context.Tickets.FindAsync(id);
             if (ticket == null)
-            {
                 return NotFound();
-            }
+
             ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name", ticket.EventId);
-            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(EventManagementMvc.Models.TicketStatus)), ticket.Status);
+            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(TicketStatus)), ticket.Status);
             return View(ticket);
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("Id,EventId,Price,Status,PurchasedByUserId,IsActive")] Ticket ticket)
         {
             if (id != ticket.Id)
-            {
                 return NotFound();
-            }
 
             if (ModelState.IsValid)
             {
@@ -160,47 +171,42 @@ namespace EventManagementMvc.Controllers
                 catch (DbUpdateConcurrencyException)
                 {
                     if (!TicketExists(ticket.Id))
-                    {
                         return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
+
+                    throw;
                 }
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["EventId"] = new SelectList(_context.Events, "Id", "CreatedByUserId", ticket.EventId);
+
+            ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name", ticket.EventId);
+            ViewData["Status"] = new SelectList(Enum.GetValues(typeof(TicketStatus)), ticket.Status);
             return View(ticket);
         }
 
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
-            {
                 return NotFound();
-            }
 
             var ticket = await _context.Tickets
                 .Include(t => t.Event)
                 .FirstOrDefaultAsync(m => m.Id == id);
+
             if (ticket == null)
-            {
                 return NotFound();
-            }
 
             return View(ticket);
         }
 
         [HttpPost, ActionName("Delete")]
+        [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var ticket = await _context.Tickets.FindAsync(id);
             if (ticket != null)
-            {
                 _context.Tickets.Remove(ticket);
-            }
 
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
@@ -210,13 +216,12 @@ namespace EventManagementMvc.Controllers
         {
             return _context.Tickets.Any(e => e.Id == id);
         }
+
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ToggleActive(int id)
         {
-            if (!User.IsInRole("Admin"))
-                return Forbid();
-
             var ticket = await _context.Tickets.FindAsync(id);
             if (ticket == null)
                 return NotFound();
@@ -226,6 +231,5 @@ namespace EventManagementMvc.Controllers
 
             return RedirectToAction(nameof(Index));
         }
-
     }
 }
