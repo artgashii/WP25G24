@@ -31,6 +31,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddHttpClient();
 builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransformation, EventManagementMvc.Services.RoleClaimTransformation>();
 
+builder.Services.AddScoped<EventManagementMvc.Services.IAuditLogger, EventManagementMvc.Services.AuditLogger>();
 
 var app = builder.Build();
 

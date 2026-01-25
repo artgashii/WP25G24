@@ -6,8 +6,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
-
-
 namespace EventManagementMvc.Controllers.Api
 {
     [ApiController]
@@ -16,7 +14,6 @@ namespace EventManagementMvc.Controllers.Api
     {
         private readonly ApplicationDbContext _context;
         private readonly IAuditLogger _audit;
-
 
         public EventsApiController(ApplicationDbContext context, IAuditLogger audit)
         {
@@ -29,6 +26,7 @@ namespace EventManagementMvc.Controllers.Api
         {
             var events = await _context.Events
                 .AsNoTracking()
+                .Include(e => e.Category)
                 .Where(e => e.IsActive)
                 .Select(e => new
                 {
@@ -46,25 +44,7 @@ namespace EventManagementMvc.Controllers.Api
 
             return Ok(events);
         }
-        [HttpPost]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> CreateEvent([FromBody] Event input)
-        {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
-            input.CreatedByUserId = userId;
 
-            _context.Events.Add(input);
-            await _context.SaveChangesAsync();
-
-            await _audit.LogAsync(
-                action: "EventCreated",
-                entityType: "Event",
-                entityId: input.Id,
-                details: $"Name={input.Name}"
-            );
-
-            return CreatedAtAction(nameof(GetEventById), new { id = input.Id }, input);
-        }
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetEventById(int id)
         {
@@ -74,7 +54,6 @@ namespace EventManagementMvc.Controllers.Api
                 .FirstOrDefaultAsync(e => e.Id == id);
 
             if (ev == null) return NotFound();
-
             if (!ev.IsActive) return NotFound();
 
             return Ok(new
@@ -90,20 +69,74 @@ namespace EventManagementMvc.Controllers.Api
                 CategoryName = ev.Category != null ? ev.Category.Name : null
             });
         }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<IActionResult> CreateEvent([FromBody] Event input)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var isAdmin = User.IsInRole("Admin");
+
+            var category = await _context.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == input.CategoryId);
+            if (category == null)
+                return BadRequest("Invalid CategoryId.");
+
+            if (!isAdmin && !category.IsActive)
+                return BadRequest("Category is inactive.");
+
+            if (!isAdmin)
+                input.IsActive = true;
+
+            input.Id = 0; 
+            input.CreatedByUserId = userId;
+
+            _context.Events.Add(input);
+            await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(
+                action: "EventCreated",
+                entityType: "Event",
+                entityId: input.Id,
+                details: $"Name={input.Name}; CategoryId={input.CategoryId}"
+            );
+
+            return CreatedAtAction(nameof(GetEventById), new { id = input.Id }, input);
+        }
+
+        
         [HttpPut("{id:int}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public async Task<IActionResult> UpdateEvent(int id, [FromBody] Event input)
         {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var isAdmin = User.IsInRole("Admin");
+
             var existing = await _context.Events.FindAsync(id);
             if (existing == null) return NotFound();
+
+        
+            if (!isAdmin && existing.CreatedByUserId != userId)
+                return Forbid();
+
+           
+            var category = await _context.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Id == input.CategoryId);
+            if (category == null)
+                return BadRequest("Invalid CategoryId.");
+
+           
+            if (!isAdmin && !category.IsActive)
+                return BadRequest("Category is inactive.");
 
             existing.Name = input.Name;
             existing.Description = input.Description;
             existing.Date = input.Date;
             existing.Location = input.Location;
             existing.ImagePath = input.ImagePath;
-            existing.IsActive = input.IsActive;
             existing.CategoryId = input.CategoryId;
+
+         
+            if (isAdmin)
+                existing.IsActive = input.IsActive;
 
             await _context.SaveChangesAsync();
 
@@ -111,18 +144,26 @@ namespace EventManagementMvc.Controllers.Api
                 action: "EventUpdated",
                 entityType: "Event",
                 entityId: id,
-                details: $"Name={existing.Name}; IsActive={existing.IsActive}"
+                details: $"Name={existing.Name}; IsActive={existing.IsActive}; CategoryId={existing.CategoryId}"
             );
 
             return NoContent();
         }
 
+     
         [HttpDelete("{id:int}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize]
         public async Task<IActionResult> DeleteEvent(int id)
         {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var isAdmin = User.IsInRole("Admin");
+
             var existing = await _context.Events.FindAsync(id);
             if (existing == null) return NotFound();
+
+    
+            if (!isAdmin && existing.CreatedByUserId != userId)
+                return Forbid();
 
             var name = existing.Name;
 
@@ -138,8 +179,5 @@ namespace EventManagementMvc.Controllers.Api
 
             return NoContent();
         }
-
-
-
     }
 }

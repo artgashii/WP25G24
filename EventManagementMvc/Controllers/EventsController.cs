@@ -1,8 +1,9 @@
-using EventManagementMvc.Areas.Identity.Data;
+﻿using EventManagementMvc.Areas.Identity.Data;
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
 using EventManagementMvc.Models.Dto;
 using EventManagementMvc.Models.ViewModels;
+using EventManagementMvc.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -18,15 +19,18 @@ namespace EventManagementMvc.Controllers
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ApplicationDbContext _context;
         private readonly UserManager<EventManagementMvcUser> _userManager;
+        private readonly IAuditLogger _audit;
 
         public EventsController(
             ApplicationDbContext context,
             UserManager<EventManagementMvcUser> userManager,
-            IHttpClientFactory httpClientFactory)
+            IHttpClientFactory httpClientFactory,
+            IAuditLogger audit)
         {
             _context = context;
             _userManager = userManager;
             _httpClientFactory = httpClientFactory;
+            _audit = audit;
         }
 
         public async Task<IActionResult> Index(
@@ -82,7 +86,6 @@ namespace EventManagementMvc.Controllers
                 .Take(pageSize)
                 .ToListAsync();
 
-            
             var categoriesQuery = _context.Categories.AsNoTracking();
             if (!isAdmin)
                 categoriesQuery = categoriesQuery.Where(c => c.IsActive);
@@ -103,7 +106,6 @@ namespace EventManagementMvc.Controllers
             return View(items);
         }
 
-        
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null) return NotFound();
@@ -114,25 +116,28 @@ namespace EventManagementMvc.Controllers
 
             if (@event == null) return NotFound();
 
-            
             if (!@event.IsActive && !User.IsInRole("Admin"))
                 return NotFound();
 
-            
             if (!await CanViewEventAsync(@event))
                 return Forbid();
 
             HttpContext.Session.SetInt32("LastViewedEventId", @event.Id);
             HttpContext.Session.SetString("LastViewedEventName", @event.Name ?? "");
 
+            await _audit.LogAsync(
+                action: "EventViewed",
+                entityType: "Event",
+                entityId: @event.Id,
+                details: $"Name={@event.Name}"
+            );
+
             return View(@event);
         }
 
-        
         [Authorize]
         public async Task<IActionResult> Create()
         {
-           
             var categoriesQuery = _context.Categories.AsNoTracking();
             if (!User.IsInRole("Admin"))
                 categoriesQuery = categoriesQuery.Where(c => c.IsActive);
@@ -146,7 +151,6 @@ namespace EventManagementMvc.Controllers
             return View();
         }
 
-        
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -160,7 +164,6 @@ namespace EventManagementMvc.Controllers
                 var client = _httpClientFactory.CreateClient();
                 client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
-                
                 if (Request.Headers.TryGetValue("Cookie", out var cookie))
                 {
                     client.DefaultRequestHeaders.Remove("Cookie");
@@ -175,7 +178,6 @@ namespace EventManagementMvc.Controllers
                     var body = await response.Content.ReadAsStringAsync();
                     ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
 
-                    
                     var categoriesQuery = _context.Categories.AsNoTracking();
                     if (!User.IsInRole("Admin"))
                         categoriesQuery = categoriesQuery.Where(c => c.IsActive);
@@ -193,7 +195,6 @@ namespace EventManagementMvc.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            
             var categoriesQuery2 = _context.Categories.AsNoTracking();
             if (!User.IsInRole("Admin"))
                 categoriesQuery2 = categoriesQuery2.Where(c => c.IsActive);
@@ -208,7 +209,6 @@ namespace EventManagementMvc.Controllers
             return View(@event);
         }
 
-        
         [Authorize]
         public async Task<IActionResult> Edit(int? id)
         {
@@ -220,7 +220,6 @@ namespace EventManagementMvc.Controllers
             if (!await CanEditEventAsync(@event))
                 return Forbid();
 
-            
             var categoriesQuery = _context.Categories.AsNoTracking();
             if (!User.IsInRole("Admin"))
                 categoriesQuery = categoriesQuery.Where(c => c.IsActive);
@@ -235,7 +234,6 @@ namespace EventManagementMvc.Controllers
             return View(@event);
         }
 
-        
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -249,13 +247,11 @@ namespace EventManagementMvc.Controllers
             if (!await CanEditEventAsync(existingEvent))
                 return Forbid();
 
-           
             editedEvent.CreatedByUserId = existingEvent.CreatedByUserId;
             ModelState.Remove("CreatedByUserId");
 
             if (!ModelState.IsValid)
             {
-                
                 var categoriesQuery = _context.Categories.AsNoTracking();
                 if (!User.IsInRole("Admin"))
                     categoriesQuery = categoriesQuery.Where(c => c.IsActive);
@@ -273,7 +269,6 @@ namespace EventManagementMvc.Controllers
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
-            
             if (Request.Headers.TryGetValue("Cookie", out var cookie))
             {
                 client.DefaultRequestHeaders.Remove("Cookie");
@@ -305,7 +300,6 @@ namespace EventManagementMvc.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        
         [Authorize]
         public async Task<IActionResult> Delete(int? id)
         {
@@ -337,7 +331,6 @@ namespace EventManagementMvc.Controllers
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
-            
             if (Request.Headers.TryGetValue("Cookie", out var cookie))
             {
                 client.DefaultRequestHeaders.Remove("Cookie");
@@ -352,7 +345,6 @@ namespace EventManagementMvc.Controllers
                 var body = await response.Content.ReadAsStringAsync();
                 ModelState.AddModelError("", $"API error: {(int)response.StatusCode} {response.StatusCode}. {body}");
 
-               
                 var fullEvent = await _context.Events.Include(e => e.Category).FirstOrDefaultAsync(e => e.Id == id);
                 if (fullEvent == null) return RedirectToAction(nameof(Index));
                 return View("Delete", fullEvent);
@@ -378,7 +370,6 @@ namespace EventManagementMvc.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-       
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Permissions(int id)
         {
@@ -454,11 +445,6 @@ namespace EventManagementMvc.Controllers
             return RedirectToAction(nameof(Permissions), new { id = vm.EventId });
         }
 
-        private bool EventExists(int id)
-        {
-            return _context.Events.Any(e => e.Id == id);
-        }
-
         private async Task<bool> HasEventPermissionAsync(int eventId, string userId, bool requireEdit)
         {
             var p = await _context.EventPermissions
@@ -471,13 +457,9 @@ namespace EventManagementMvc.Controllers
 
         private async Task<bool> CanViewEventAsync(Event ev)
         {
-            
             if (ev.IsActive) return true;
-
-            
             if (User.IsInRole("Admin")) return true;
 
-            
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userId == null) return false;
 
