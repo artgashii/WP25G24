@@ -28,6 +28,9 @@ builder.Services.AddSession(options =>
 });
 
 builder.Services.AddControllersWithViews();
+builder.Services.AddHttpClient();
+builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransformation, EventManagementMvc.Services.RoleClaimTransformation>();
+
 
 var app = builder.Build();
 
@@ -52,11 +55,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
+    name: "areas",
+    pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+
+app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
 
 app.MapRazorPages();
 
 app.Run();
 
 public partial class Program { }
+
