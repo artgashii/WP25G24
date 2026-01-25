@@ -28,6 +28,12 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-controller="Tickets" asp-action="Index">Tickets</a>
                         </li>
+                        @if (User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-controller="Logs" asp-action="Index">Logs</a>
+                            </li>
+                        }
 
                     </ul>
                     <partial name="_LoginPartial" />

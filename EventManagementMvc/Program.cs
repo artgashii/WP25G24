@@ -22,6 +22,9 @@ builder.Services.AddDefaultIdentity<EventManagementMvcUser>(options =>
 
 builder.Services.AddControllersWithViews();
 builder.Services.AddDistributedMemoryCache();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<EventManagementMvc.Services.IAuditLogger, EventManagementMvc.Services.AuditLogger>();
+
 
 builder.Services.AddSession(options =>
 {
