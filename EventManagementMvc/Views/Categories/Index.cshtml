@@ -46,9 +46,13 @@
     </div>
 </form>
 
-<p>
-    <a asp-action="Create">Create New</a>
-</p>
+@if (User.IsInRole("Admin"))
+{
+    <p>
+        <a asp-action="Create">Create New</a>
+    </p>
+}
+
 
 <p class="text-muted">
     Total: <strong>@total</strong> | Page <strong>@currentPage</strong> of <strong>@totalPages</strong>
@@ -88,10 +92,26 @@
                 <td>@item.Name</td>
                 <td>@item.IsActive</td>
                 <td>
-                    <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
-                    <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
-                    <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+                    <a asp-action="Details" asp-route-id="@item.Id">Details</a>
+
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <text> | </text>
+                        <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                        <text> | </text>
+                        <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+
+                        <text> | </text>
+                        <form asp-action="ToggleActive" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <button type="submit" class="btn btn-sm @(item.IsActive ? "btn-outline-warning" : "btn-outline-success")">
+                                @(item.IsActive ? "Deactivate" : "Activate")
+                            </button>
+                        </form>
+                    }
                 </td>
+
             </tr>
         }
     </tbody>
