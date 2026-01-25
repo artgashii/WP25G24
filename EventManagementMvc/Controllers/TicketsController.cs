@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -7,16 +7,19 @@ using Microsoft.EntityFrameworkCore;
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
 using Microsoft.AspNetCore.Authorization;
+using EventManagementMvc.Services;
 
 namespace EventManagementMvc.Controllers
 {
     public class TicketsController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IAuditLogger _audit;
 
-        public TicketsController(ApplicationDbContext context)
+        public TicketsController(ApplicationDbContext context, IAuditLogger audit)
         {
             _context = context;
+            _audit = audit;
         }
 
         public async Task<IActionResult> Index(
@@ -34,14 +37,14 @@ namespace EventManagementMvc.Controllers
             IQueryable<Ticket> query = _context.Tickets
                 .Include(t => t.Event);
 
-            // Non-admin users should only see active tickets (regardless of checkbox)
+           
             if (!User.IsInRole("Admin"))
             {
                 query = query.Where(t => t.IsActive);
             }
             else
             {
-                // Admin can optionally filter active only
+               
                 if (activeOnly.HasValue && activeOnly.Value)
                     query = query.Where(t => t.IsActive);
             }
@@ -85,7 +88,7 @@ namespace EventManagementMvc.Controllers
             ViewBag.Total = total;
             ViewBag.EventId = eventId ?? 0;
 
-            // For non-admin, force checkbox false in UI because it’s redundant
+            
             ViewBag.ActiveOnly = User.IsInRole("Admin") ? (activeOnly ?? false) : true;
 
             ViewBag.Sort = sort;
@@ -106,9 +109,16 @@ namespace EventManagementMvc.Controllers
             if (ticket == null)
                 return NotFound();
 
-            // Non-admin users cannot view inactive tickets
+          
             if (!User.IsInRole("Admin") && !ticket.IsActive)
                 return NotFound();
+
+            await _audit.LogAsync(
+                action: "TicketViewed",
+                entityType: "Ticket",
+                entityId: ticket.Id,
+                details: $"EventId={ticket.EventId}; Price={ticket.Price}; Status={ticket.Status}"
+            );
 
             return View(ticket);
         }

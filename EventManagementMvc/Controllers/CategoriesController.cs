@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -6,16 +6,19 @@ using Microsoft.EntityFrameworkCore;
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
 using Microsoft.AspNetCore.Authorization;
+using EventManagementMvc.Services;
 
 namespace EventManagementMvc.Controllers
 {
     public class CategoriesController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IAuditLogger _audit;
 
-        public CategoriesController(ApplicationDbContext context)
+        public CategoriesController(ApplicationDbContext context, IAuditLogger audit)
         {
             _context = context;
+            _audit = audit;
         }
 
         public async Task<IActionResult> Index(
@@ -31,7 +34,6 @@ namespace EventManagementMvc.Controllers
 
             IQueryable<Category> query = _context.Categories;
 
-            // Non-admin users should only see active categories
             if (!User.IsInRole("Admin"))
                 query = query.Where(c => c.IsActive);
 
@@ -78,9 +80,17 @@ namespace EventManagementMvc.Controllers
             if (category == null)
                 return NotFound();
 
-            // Non-admin users cannot view inactive categories
+            
             if (!User.IsInRole("Admin") && !category.IsActive)
                 return NotFound();
+
+            
+            await _audit.LogAsync(
+                action: "CategoryViewed",
+                entityType: "Category",
+                entityId: category.Id,
+                details: $"Name={category.Name}"
+            );
 
             return View(category);
         }
