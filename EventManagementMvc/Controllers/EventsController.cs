@@ -29,48 +29,76 @@ namespace EventManagementMvc.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        // GET: Events
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            int page = 1,
+            int pageSize = 10,
+            string? q = null,
+            int? categoryId = null,
+            bool? activeOnly = null,
+            string sort = "Date",
+            string dir = "asc")
         {
+            if (page < 1) page = 1;
+            if (pageSize < 5) pageSize = 5;
+            if (pageSize > 50) pageSize = 50;
+
             var isAdmin = User.IsInRole("Admin");
 
-            // Admin: use DB (see all, includes Category navigation, includes inactive)
-            if (isAdmin)
+            IQueryable<Event> query = _context.Events
+                .Include(e => e.Category);
+
+            if (!isAdmin)
+                query = query.Where(e => e.IsActive);
+
+            if (!string.IsNullOrWhiteSpace(q))
+                query = query.Where(e => e.Name.Contains(q) || (e.Description != null && e.Description.Contains(q)));
+
+            if (categoryId.HasValue && categoryId.Value > 0)
+                query = query.Where(e => e.CategoryId == categoryId.Value);
+
+            if (isAdmin && activeOnly.HasValue && activeOnly.Value)
+                query = query.Where(e => e.IsActive);
+
+            bool asc = dir.Equals("asc", StringComparison.OrdinalIgnoreCase);
+
+            query = (sort, asc) switch
             {
-                var adminEvents = await _context.Events
-                    .Include(e => e.Category)
-                    .ToListAsync();
+                ("Name", true) => query.OrderBy(e => e.Name),
+                ("Name", false) => query.OrderByDescending(e => e.Name),
 
-                return View(adminEvents);
-            }
+                ("Date", true) => query.OrderBy(e => e.Date),
+                ("Date", false) => query.OrderByDescending(e => e.Date),
 
-            // Everyone else: use API (active only)
-            var client = _httpClientFactory.CreateClient();
-            client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
+                ("Category", true) => query.OrderBy(e => e.Category!.Name),
+                ("Category", false) => query.OrderByDescending(e => e.Category!.Name),
 
-            var apiUrl = "/api/events";
-            var apiEvents = await client.GetFromJsonAsync<List<EventListItemDto>>(apiUrl) ?? new();
+                _ => query.OrderBy(e => e.Date)
+            };
 
-            // Map DTO -> Event for existing MVC view
-            var events = apiEvents.Select(e => new Event
-            {
-                Id = e.Id,
-                Name = e.Name ?? "",
-                Description = e.Description,
-                Date = e.Date,
-                Location = e.Location,
-                ImagePath = e.ImagePath,
-                IsActive = e.IsActive,
-                CategoryId = e.CategoryId,
-                Category = new Category
-                {
-                    Id = e.CategoryId,
-                    Name = e.CategoryName ?? ""
-                }
-            }).ToList();
+            var total = await query.CountAsync();
 
-            return View(events);
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            ViewBag.Categories = await _context.Categories
+                .AsNoTracking()
+                .OrderBy(c => c.Name)
+                .ToListAsync();
+
+            ViewBag.Page = page;
+            ViewBag.PageSize = pageSize;
+            ViewBag.Total = total;
+            ViewBag.Q = q ?? "";
+            ViewBag.CategoryId = categoryId ?? 0;
+            ViewBag.ActiveOnly = activeOnly ?? false;
+            ViewBag.Sort = sort;
+            ViewBag.Dir = dir;
+
+            return View(items);
         }
+
 
         // GET: Events/Details/5
         public async Task<IActionResult> Details(int? id)

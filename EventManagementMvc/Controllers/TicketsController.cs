@@ -19,22 +19,71 @@ namespace EventManagementMvc.Controllers
             _context = context;
         }
 
-        // GET: Tickets
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+    int page = 1,
+    int pageSize = 10,
+    int? eventId = null,
+    bool? activeOnly = null,
+    string sort = "Id",
+    string dir = "asc")
         {
-            var isAdmin = User.IsInRole("Admin");
+            if (page < 1) page = 1;
+            if (pageSize < 5) pageSize = 5;
+            if (pageSize > 50) pageSize = 50;
 
-            IQueryable<Ticket> query =
-                _context.Tickets.Include(t => t.Event);
+            IQueryable<Ticket> query = _context.Tickets
+                .Include(t => t.Event);
 
-            if (!isAdmin)
+            if (eventId.HasValue && eventId.Value > 0)
+                query = query.Where(t => t.EventId == eventId.Value);
+
+            if (activeOnly.HasValue && activeOnly.Value)
                 query = query.Where(t => t.IsActive);
 
-            return View(await query.ToListAsync());
+            bool asc = dir.Equals("asc", StringComparison.OrdinalIgnoreCase);
+            query = (sort, asc) switch
+            {
+                ("Price", true) => query.OrderBy(t => t.Price),
+                ("Price", false) => query.OrderByDescending(t => t.Price),
+
+                ("Status", true) => query.OrderBy(t => t.Status),
+                ("Status", false) => query.OrderByDescending(t => t.Status),
+
+                ("Event", true) => query.OrderBy(t => t.Event!.Name),
+                ("Event", false) => query.OrderByDescending(t => t.Event!.Name),
+
+                ("IsActive", true) => query.OrderBy(t => t.IsActive),
+                ("IsActive", false) => query.OrderByDescending(t => t.IsActive),
+
+                ("Id", false) => query.OrderByDescending(t => t.Id),
+                _ => query.OrderBy(t => t.Id)
+            };
+
+            var total = await query.CountAsync();
+
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            ViewBag.Events = await _context.Events
+                .AsNoTracking()
+                .OrderBy(e => e.Name)
+                .ToListAsync();
+
+            ViewBag.Page = page;
+            ViewBag.PageSize = pageSize;
+            ViewBag.Total = total;
+            ViewBag.EventId = eventId ?? 0;
+            ViewBag.ActiveOnly = activeOnly ?? false;
+            ViewBag.Sort = sort;
+            ViewBag.Dir = dir;
+
+            return View(items);
         }
 
 
-        // GET: Tickets/Details/5
+
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -53,7 +102,6 @@ namespace EventManagementMvc.Controllers
             return View(ticket);
         }
 
-        // GET: Tickets/Create
         public IActionResult Create()
         {
             ViewData["EventId"] = new SelectList(_context.Events, "Id", "Name");
@@ -61,9 +109,6 @@ namespace EventManagementMvc.Controllers
             return View();
         }
 
-        // POST: Tickets/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,EventId,Price,Status,PurchasedByUserId,IsActive")] Ticket ticket)
@@ -79,7 +124,6 @@ namespace EventManagementMvc.Controllers
             return View(ticket);
         }
 
-        // GET: Tickets/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -97,9 +141,6 @@ namespace EventManagementMvc.Controllers
             return View(ticket);
         }
 
-        // POST: Tickets/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("Id,EventId,Price,Status,PurchasedByUserId,IsActive")] Ticket ticket)
@@ -133,7 +174,6 @@ namespace EventManagementMvc.Controllers
             return View(ticket);
         }
 
-        // GET: Tickets/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -152,7 +192,6 @@ namespace EventManagementMvc.Controllers
             return View(ticket);
         }
 
-        // POST: Tickets/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)

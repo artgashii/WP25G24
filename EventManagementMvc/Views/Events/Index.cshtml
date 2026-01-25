@@ -1,102 +1,177 @@
 @model IEnumerable<EventManagementMvc.Models.Event>
 
 @{
-    ViewData["Title"] = "Index";
+    ViewData["Title"] = "Events";
+
+    int currentPage = ViewBag.Page ?? 1;
+    int pageSize = ViewBag.PageSize ?? 10;
+    int total = ViewBag.Total ?? 0;
+
+    string q = ViewBag.Q ?? "";
+    int categoryId = ViewBag.CategoryId ?? 0;
+    bool activeOnly = ViewBag.ActiveOnly ?? false;
+
+    string sort = ViewBag.Sort ?? "Date";
+    string dir = ViewBag.Dir ?? "asc";
+
+    int totalPages = (int)Math.Ceiling(total / (double)pageSize);
+    if (totalPages < 1) totalPages = 1;
+
+    string NextDir(string col) => (sort == col && dir == "asc") ? "desc" : "asc";
+
+    var categories = ViewBag.Categories as List<EventManagementMvc.Models.Category> ?? new();
 }
 
-<h1>Index</h1>
+<h1>Events</h1>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input name="q" class="form-control" placeholder="Search name/description..."
+               value="@q" />
+    </div>
+
+    <div class="col-md-3">
+        <select name="categoryId" class="form-select">
+            <option value="0">All categories</option>
+            @foreach (var c in categories)
+            {
+                <option value="@c.Id" selected="@(c.Id == categoryId)">@c.Name</option>
+            }
+        </select>
+    </div>
+
+    @if (User.IsInRole("Admin"))
+    {
+        <div class="col-md-2 d-flex align-items-center">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="activeOnly" name="activeOnly" value="true"
+                       @(activeOnly ? "checked" : "") />
+                <label class="form-check-label" for="activeOnly">Active only</label>
+            </div>
+        </div>
+    }
+
+    <div class="col-md-3">
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Filter</button>
+
+            <a class="btn btn-outline-secondary"
+               asp-action="Index"
+               asp-route-page="1"
+               asp-route-pageSize="@pageSize"
+               asp-route-sort="@sort"
+               asp-route-dir="@dir">Reset</a>
+        </div>
+    </div>
+</form>
 
 <p>
     <a asp-action="Create">Create New</a>
 </p>
-<table class="table">
+
+<p class="text-muted">
+    Total: <strong>@total</strong> | Page <strong>@currentPage</strong> of <strong>@totalPages</strong>
+</p>
+
+<table class="table table-striped table-sm">
     <thead>
         <tr>
             <th>
-                @Html.DisplayNameFor(model => model.Name)
+                <a asp-action="Index"
+                   asp-route-page="1"
+                   asp-route-pageSize="@pageSize"
+                   asp-route-q="@q"
+                   asp-route-categoryId="@categoryId"
+                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-sort="Name"
+                   asp-route-dir="@NextDir("Name")">
+                    Name
+                </a>
             </th>
+            <th>Description</th>
             <th>
-                @Html.DisplayNameFor(model => model.Description)
+                <a asp-action="Index"
+                   asp-route-page="1"
+                   asp-route-pageSize="@pageSize"
+                   asp-route-q="@q"
+                   asp-route-categoryId="@categoryId"
+                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-sort="Date"
+                   asp-route-dir="@NextDir("Date")">
+                    Date
+                </a>
             </th>
+            <th>Location</th>
+            <th>ImagePath</th>
+            <th>IsActive</th>
             <th>
-                @Html.DisplayNameFor(model => model.Date)
+                <a asp-action="Index"
+                   asp-route-page="1"
+                   asp-route-pageSize="@pageSize"
+                   asp-route-q="@q"
+                   asp-route-categoryId="@categoryId"
+                   asp-route-activeOnly="@(activeOnly ? "true" : null)"
+                   asp-route-sort="Category"
+                   asp-route-dir="@NextDir("Category")">
+                    Category
+                </a>
             </th>
-            <th>
-                @Html.DisplayNameFor(model => model.Location)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.ImagePath)
-            </th>
-            <th>Status</th>
-
-            <th>
-                @Html.DisplayNameFor(model => model.Category)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.CreatedByUserId)
-            </th>
+            <th>CreatedByUserId</th>
             <th></th>
         </tr>
     </thead>
     <tbody>
-@foreach (var item in Model) {
-        <tr>
-            <td>
-                @Html.DisplayFor(modelItem => item.Name)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Description)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Date)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Location)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.ImagePath)
-            </td>
-                <td>
-                    @(item.IsActive ? "Active" : "Inactive")
-
-                    @if (User.IsInRole("Admin"))
-                    {
-                        <form asp-action="ToggleActive" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            <input type="hidden" name="id" value="@item.Id" />
-                            <button type="submit" class="btn btn-sm btn-outline-secondary ms-2">
-                                @(item.IsActive ? "Deactivate" : "Activate")
-                            </button>
-                        </form>
-                    }
-                </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Category.Name)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.CreatedByUserId)
-            </td>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>@item.Name</td>
+                <td>@item.Description</td>
+                <td>@item.Date</td>
+                <td>@item.Location</td>
+                <td>@item.ImagePath</td>
+                <td>@item.IsActive</td>
+                <td>@(item.Category?.Name)</td>
+                <td>@item.CreatedByUserId</td>
                 <td>
                     <a asp-action="Details" asp-route-id="@item.Id">Details</a>
-
-                    @if (User.IsInRole("Admin") || (User.Identity?.IsAuthenticated == true && item.CreatedByUserId == User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value))
-                    {
-                        <span> | </span>
-                        <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
-                        <span> | </span>
-                        <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
-                    }
+                    |
+                    <a asp-action="Edit" asp-route-id="@item.Id">Edit</a>
+                    |
+                    <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
                 </td>
-                <td>
-                    @if (User.IsInRole("Admin"))
-                    {
-                        <span> | </span>
-                        <a asp-action="Permissions" asp-route-id="@item.Id">Permissions</a>
-                    }
-
-                </td>
-
-        </tr>
-}
+            </tr>
+        }
     </tbody>
 </table>
+
+<nav aria-label="Events pagination">
+    <ul class="pagination">
+        <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+            <a class="page-link"
+               asp-action="Index"
+               asp-route-page="@(currentPage - 1)"
+               asp-route-pageSize="@pageSize"
+               asp-route-q="@q"
+               asp-route-categoryId="@categoryId"
+               asp-route-activeOnly="@(activeOnly ? "true" : null)"
+               asp-route-sort="@sort"
+               asp-route-dir="@dir">Previous</a>
+        </li>
+
+        <li class="page-item disabled">
+            <span class="page-link">Page @currentPage / @totalPages</span>
+        </li>
+
+        <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+            <a class="page-link"
+               asp-action="Index"
+               asp-route-page="@(currentPage + 1)"
+               asp-route-pageSize="@pageSize"
+               asp-route-q="@q"
+               asp-route-categoryId="@categoryId"
+               asp-route-activeOnly="@(activeOnly ? "true" : null)"
+               asp-route-sort="@sort"
+               asp-route-dir="@dir">Next</a>
+        </li>
+    </ul>
+</nav>

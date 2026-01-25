@@ -19,19 +19,52 @@ namespace EventManagementMvc.Controllers
             _context = context;
         }
 
-        // GET: Categories
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(
+            int page = 1,
+            int pageSize = 10,
+            string? q = null,
+            string sort = "Name",
+            string dir = "asc")
         {
-            var isAdmin = User.IsInRole("Admin");
-            var query = _context.Categories.AsQueryable();
+            if (page < 1) page = 1;
+            if (pageSize < 5) pageSize = 5;
+            if (pageSize > 50) pageSize = 50;
 
-            if (!isAdmin)
-                query = query.Where(c => c.IsActive);
+            IQueryable<Category> query = _context.Categories;
 
-            return View(await query.ToListAsync());
+            if (!string.IsNullOrWhiteSpace(q))
+                query = query.Where(c => c.Name.Contains(q));
+
+            bool asc = dir.Equals("asc", StringComparison.OrdinalIgnoreCase);
+            query = (sort, asc) switch
+            {
+                ("Name", true) => query.OrderBy(c => c.Name),
+                ("Name", false) => query.OrderByDescending(c => c.Name),
+
+                ("IsActive", true) => query.OrderBy(c => c.IsActive),
+                ("IsActive", false) => query.OrderByDescending(c => c.IsActive),
+
+                _ => query.OrderBy(c => c.Name)
+            };
+
+            var total = await query.CountAsync();
+
+            var items = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            ViewBag.Page = page;
+            ViewBag.PageSize = pageSize;
+            ViewBag.Total = total;
+            ViewBag.Q = q ?? "";
+            ViewBag.Sort = sort;
+            ViewBag.Dir = dir;
+
+            return View(items);
         }
 
-        // GET: Categories/Details/5
+
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -49,15 +82,11 @@ namespace EventManagementMvc.Controllers
             return View(category);
         }
 
-        // GET: Categories/Create
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Categories/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create([Bind("Id,Name,IsActive")] Category category)
@@ -71,7 +100,6 @@ namespace EventManagementMvc.Controllers
             return View(category);
         }
 
-        // GET: Categories/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -87,9 +115,6 @@ namespace EventManagementMvc.Controllers
             return View(category);
         }
 
-        // POST: Categories/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(int id, [Bind("Id,Name,IsActive")] Category category)
@@ -122,7 +147,6 @@ namespace EventManagementMvc.Controllers
             return View(category);
         }
 
-        // GET: Categories/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -140,7 +164,6 @@ namespace EventManagementMvc.Controllers
             return View(category);
         }
 
-        // POST: Categories/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
