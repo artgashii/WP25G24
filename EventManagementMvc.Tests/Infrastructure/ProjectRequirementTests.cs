@@ -1,6 +1,4 @@
-﻿using System;
-using System.Net;
-using System.Threading.Tasks;
+﻿using System.Net;
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
 using EventManagementMvc.Tests.Infrastructure;

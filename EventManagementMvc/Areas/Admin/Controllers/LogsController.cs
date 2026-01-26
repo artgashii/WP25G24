@@ -71,12 +71,5 @@ namespace EventManagementMvc.Areas.Admin.Controllers
 
             return View(items);
         }
-
-        [HttpGet]
-        public async Task<IActionResult> Test()
-        {
-            var count = await _context.LogEntries.CountAsync();
-            return Ok(new { count });
-        }
     }
 }

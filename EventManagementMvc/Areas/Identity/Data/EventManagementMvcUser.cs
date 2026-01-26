@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Identity;
 
 namespace EventManagementMvc.Areas.Identity.Data;
 
-// Add profile data for application users by adding properties to the EventManagementMvcUser class
 public class EventManagementMvcUser : IdentityUser
 {
 }

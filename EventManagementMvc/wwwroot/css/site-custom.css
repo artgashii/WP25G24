@@ -1,0 +1,30 @@
+﻿body {
+}
+.navbar {
+    padding: 1rem 2rem;
+}
+
+    .navbar .logo-text {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .navbar .navbar-nav .nav-link {
+        margin-right: 1rem;
+        font-weight: 500;
+        color: #444;
+    }
+
+        .navbar .navbar-nav .nav-link:hover {
+            color: #007bff;
+        }
+
+    .navbar .btn {
+        font-weight: 500;
+    }
+
+.event-card-img {
+    object-fit: cover;
+    height: 200px;
+}

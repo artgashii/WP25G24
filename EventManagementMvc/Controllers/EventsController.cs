@@ -8,8 +8,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using System.Net.Http.Json;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
 
 namespace EventManagementMvc.Controllers
 {
@@ -19,17 +19,21 @@ namespace EventManagementMvc.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UserManager<EventManagementMvcUser> _userManager;
         private readonly IAuditLogger _audit;
+        private readonly IWebHostEnvironment _env;
 
         public EventsController(
             ApplicationDbContext context,
             UserManager<EventManagementMvcUser> userManager,
             IHttpClientFactory httpClientFactory,
-            IAuditLogger audit)
+            IAuditLogger audit,
+            IWebHostEnvironment env)
         {
             _context = context;
             _userManager = userManager;
             _httpClientFactory = httpClientFactory;
             _audit = audit;
+            _env = env;
+
         }
 
         public async Task<IActionResult> Index(
@@ -160,13 +164,42 @@ namespace EventManagementMvc.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
-        public async Task<IActionResult> Create([Bind("Id,Name,Description,Date,Location,ImagePath,IsActive,CategoryId")] Event @event)
+        public async Task<IActionResult> Create(
+            [Bind("Id,Name,Description,Date,Location,IsActive,CategoryId")] Event @event,
+            IFormFile? imageFile)
         {
             @event.CreatedByUserId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
             ModelState.Remove("CreatedByUserId");
 
             if (ModelState.IsValid)
             {
+                try
+                {
+                    var savedPath = await SaveEventImageAsync(imageFile);
+                    if (savedPath != null)
+                        @event.ImagePath = savedPath;
+                }
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError("ImagePath", ex.Message);
+                }
+
+                if (!ModelState.IsValid)
+                {
+                    var categoriesQuery = _context.Categories.AsNoTracking();
+                    if (!User.IsInRole("Admin"))
+                        categoriesQuery = categoriesQuery.Where(c => c.IsActive);
+
+                    ViewData["CategoryId"] = new SelectList(
+                        await categoriesQuery.OrderBy(c => c.Name).ToListAsync(),
+                        "Id",
+                        "Name",
+                        @event.CategoryId
+                    );
+
+                    return View(@event);
+                }
+
                 var client = _httpClientFactory.CreateClient();
                 client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
@@ -222,8 +255,12 @@ namespace EventManagementMvc.Controllers
             return View(@event);
         }
 
+
         [Authorize]
-        public async Task<IActionResult> Edit(int? id)
+        public async Task<IActionResult> Edit(
+            int? id,
+            [Bind("Id,Name,Description,Date,Location,IsActive,CategoryId")] Event editedEvent,
+            IFormFile? imageFile)
         {
             if (id == null) return NotFound();
 
@@ -250,7 +287,7 @@ namespace EventManagementMvc.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Description,Date,Location,ImagePath,IsActive,CategoryId")] Event editedEvent)
+        public async Task<IActionResult> Edit(int id, IFormFile? imageFile, [Bind("Id,Name,Description,Date,Location,IsActive,CategoryId")] Event editedEvent)
         {
             if (id != editedEvent.Id) return NotFound();
 
@@ -262,6 +299,19 @@ namespace EventManagementMvc.Controllers
 
             editedEvent.CreatedByUserId = existingEvent.CreatedByUserId;
             ModelState.Remove("CreatedByUserId");
+
+            editedEvent.ImagePath = existingEvent.ImagePath;
+
+try
+{
+    var savedPath = await SaveEventImageAsync(imageFile);
+    if (savedPath != null)
+        editedEvent.ImagePath = savedPath;
+}
+catch (Exception ex)
+{
+    ModelState.AddModelError("ImagePath", ex.Message);
+}
 
             if (!ModelState.IsValid)
             {
@@ -533,5 +583,33 @@ namespace EventManagementMvc.Controllers
 
             return await HasEventPermissionAsync(ev.Id, userId, requireEdit: true);
         }
+        private async Task<string?> SaveEventImageAsync(IFormFile? imageFile)
+        {
+            if (imageFile == null || imageFile.Length == 0)
+                return null;
+
+            const long maxSize = 5 * 1024 * 1024;
+            if (imageFile.Length > maxSize)
+                throw new InvalidOperationException("Image is too large. Max size is 5MB.");
+
+            var ext = Path.GetExtension(imageFile.FileName).ToLowerInvariant();
+            var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+            if (!allowed.Contains(ext))
+                throw new InvalidOperationException("Invalid image type. Allowed: .jpg, .jpeg, .png, .webp");
+
+            var uploadsDir = Path.Combine(_env.WebRootPath, "uploads", "events");
+            Directory.CreateDirectory(uploadsDir);
+
+            var fileName = $"{Guid.NewGuid():N}{ext}";
+            var filePath = Path.Combine(uploadsDir, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await imageFile.CopyToAsync(stream);
+            }
+
+            return $"/uploads/events/{fileName}";
+        }
+
     }
 }

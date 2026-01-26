@@ -1,66 +1,87 @@
 @model EventManagementMvc.Models.Event
 
 @{
-    ViewData["Title"] = "Details";
+    ViewData["Title"] = "Event Details";
+    bool isAdmin = User.IsInRole("Admin");
 }
 
-<h1>Details</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="m-0">Event Details</h1>
 
-<div>
-    <h4>Event</h4>
-    <hr />
-    <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Name)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Name)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Description)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Description)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Date)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Date)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Location)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Location)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.ImagePath)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.ImagePath)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.IsActive)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.IsActive)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Category)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Category.Name)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.CreatedByUserId)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.CreatedByUserId)
-        </dd>
-    </dl>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index">Back to List</a>
+        <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.Id">Edit</a>
+    </div>
 </div>
-<div>
-    <a asp-action="Edit" asp-route-id="@Model?.Id">Edit</a> |
-    <a asp-action="Index">Back to List</a>
+
+@if (!string.IsNullOrWhiteSpace(Model.ImagePath))
+{
+    <div class="mb-4">
+        <img src="@Model.ImagePath"
+             class="img-fluid rounded shadow-sm"
+             style="max-height:420px; width:100%; object-fit:cover;"
+             alt="Event image" />
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h3 class="card-title mb-3">@Model.Name</h3>
+
+                <div class="mb-3">
+                    <span class="badge text-bg-secondary me-2">
+                        @(Model.Category?.Name ?? "Uncategorized")
+                    </span>
+
+                    @if (isAdmin)
+                    {
+                        <span class="badge @(Model.IsActive ? "text-bg-success" : "text-bg-secondary")">
+                            @(Model.IsActive ? "Active" : "Inactive")
+                        </span>
+                    }
+                </div>
+
+                <p class="text-muted mb-4">@Model.Description</p>
+
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Date</dt>
+                    <dd class="col-sm-9">@Model.Date.ToString("yyyy-MM-dd")</dd>
+
+                    <dt class="col-sm-3">Location</dt>
+                    <dd class="col-sm-9">@Model.Location</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Quick info</h5>
+                <hr />
+
+                <dl class="row mb-0">
+                    <dt class="col-5">Category</dt>
+                    <dd class="col-7">@(Model.Category?.Name)</dd>
+
+                    @if (isAdmin)
+                    {
+                        <dt class="col-5">Is Active</dt>
+                        <dd class="col-7">
+                            <span class="badge @(Model.IsActive ? "text-bg-success" : "text-bg-secondary")">
+                                @(Model.IsActive ? "Yes" : "No")
+                            </span>
+                        </dd>
+
+                        <dt class="col-5">Created By</dt>
+                        <dd class="col-7">
+                            <span class="text-muted small">@Model.CreatedByUserId</span>
+                        </dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    </div>
 </div>

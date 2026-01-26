@@ -22,7 +22,6 @@ namespace EventManagementMvc.Controllers.Api
             _audit = audit;
         }
 
-        // ✅ JWT protected (proof for rubric)
         [HttpGet]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> GetActiveEvents()
@@ -48,7 +47,6 @@ namespace EventManagementMvc.Controllers.Api
             return Ok(events);
         }
 
-        // ✅ JWT protected (proof for rubric)
         [HttpGet("{id:int}")]
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IActionResult> GetEventById(int id)
@@ -75,7 +73,6 @@ namespace EventManagementMvc.Controllers.Api
             });
         }
 
-        // Cookie/Identity auth (used by MVC HttpClient that forwards cookies)
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> CreateEvent([FromBody] Event input)
@@ -111,7 +108,12 @@ namespace EventManagementMvc.Controllers.Api
             return CreatedAtAction(nameof(GetEventById), new { id = input.Id }, input);
         }
 
-        // Cookie/Identity auth (used by MVC HttpClient that forwards cookies)
+        private async Task<bool> HasEditPermissionAsync(int eventId, string userId)
+        {
+            return await _context.EventPermissions
+                .AnyAsync(p => p.EventId == eventId && p.UserId == userId && p.CanEdit);
+        }
+
         [HttpPut("{id:int}")]
         [Authorize]
         public async Task<IActionResult> UpdateEvent(int id, [FromBody] Event input)
@@ -122,7 +124,7 @@ namespace EventManagementMvc.Controllers.Api
             var existing = await _context.Events.FindAsync(id);
             if (existing == null) return NotFound();
 
-            if (!isAdmin && existing.CreatedByUserId != userId)
+            if (!isAdmin && existing.CreatedByUserId != userId && !await HasEditPermissionAsync(id, userId))
                 return Forbid();
 
             var category = await _context.Categories.AsNoTracking()
@@ -156,7 +158,6 @@ namespace EventManagementMvc.Controllers.Api
             return NoContent();
         }
 
-        // Cookie/Identity auth (used by MVC HttpClient that forwards cookies)
         [HttpDelete("{id:int}")]
         [Authorize]
         public async Task<IActionResult> DeleteEvent(int id)
@@ -167,7 +168,7 @@ namespace EventManagementMvc.Controllers.Api
             var existing = await _context.Events.FindAsync(id);
             if (existing == null) return NotFound();
 
-            if (!isAdmin && existing.CreatedByUserId != userId)
+            if (!isAdmin && existing.CreatedByUserId != userId && !await HasEditPermissionAsync(id, userId))
                 return Forbid();
 
             var name = existing.Name;

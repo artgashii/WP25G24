@@ -1,0 +1,58 @@
+﻿@{
+    var currentController = (ViewContext.RouteData.Values["controller"]?.ToString() ?? "");
+    var currentArea = (ViewContext.RouteData.Values["area"]?.ToString() ?? "");
+
+    bool IsCurrent(string area, string controller)
+        => string.Equals(currentArea, area, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase);
+
+    string LinkClass(string area, string controller)
+        => IsCurrent(area, controller)
+            ? "nav-link active fw-bold"
+            : "nav-link text-dark";
+}
+
+<ul class="navbar-nav flex-grow-1">
+    <li class="nav-item">
+        <a class="@LinkClass("", "Categories")"
+           asp-area="" asp-controller="Categories" asp-action="Index"
+           aria-current="@(IsCurrent("", "Categories") ? "page" : null)">
+            Categories
+        </a>
+    </li>
+
+    <li class="nav-item">
+        <a class="@LinkClass("", "Events")"
+           asp-area="" asp-controller="Events" asp-action="Index"
+           aria-current="@(IsCurrent("", "Events") ? "page" : null)">
+            Events
+        </a>
+    </li>
+
+    <li class="nav-item">
+        <a class="@LinkClass("", "Tickets")"
+           asp-area="" asp-controller="Tickets" asp-action="Index"
+           aria-current="@(IsCurrent("", "Tickets") ? "page" : null)">
+            Tickets
+        </a>
+    </li>
+
+    @if (User.IsInRole("Admin"))
+    {
+        <li class="nav-item">
+            <a class="@LinkClass("Admin", "Users")"
+               asp-area="Admin" asp-controller="Users" asp-action="Index"
+               aria-current="@(IsCurrent("Admin", "Users") ? "page" : null)">
+                Users
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a class="@LinkClass("Admin", "Logs")"
+               asp-area="Admin" asp-controller="Logs" asp-action="Index"
+               aria-current="@(IsCurrent("Admin", "Logs") ? "page" : null)">
+                Logs
+            </a>
+        </li>
+    }
+</ul>
