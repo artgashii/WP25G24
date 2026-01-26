@@ -1,7 +1,6 @@
 ﻿using EventManagementMvc.Areas.Identity.Data;
 using EventManagementMvc.Data;
 using EventManagementMvc.Models;
-using EventManagementMvc.Models.Dto;
 using EventManagementMvc.Models.ViewModels;
 using EventManagementMvc.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -103,6 +102,13 @@ namespace EventManagementMvc.Controllers
             ViewBag.Sort = sort;
             ViewBag.Dir = dir;
 
+            await _audit.LogAsync(
+                action: "EventsListed",
+                entityType: "Event",
+                entityId: null,
+                details: $"Page={page}; PageSize={pageSize}; Q={(q ?? "")}; CategoryId={(categoryId ?? 0)}; ActiveOnly={(activeOnly ?? false)}; Sort={sort}; Dir={dir}; Total={total}"
+            );
+
             return View(items);
         }
 
@@ -129,7 +135,7 @@ namespace EventManagementMvc.Controllers
                 action: "EventViewed",
                 entityType: "Event",
                 entityId: @event.Id,
-                details: $"Name={@event.Name}"
+                details: $"Name={@event.Name}; CategoryId={@event.CategoryId}; IsActive={@event.IsActive}"
             );
 
             return View(@event);
@@ -191,6 +197,13 @@ namespace EventManagementMvc.Controllers
 
                     return View(@event);
                 }
+
+                await _audit.LogAsync(
+                    action: "EventCreated",
+                    entityType: "Event",
+                    entityId: null,
+                    details: $"Name={@event.Name}; CategoryId={@event.CategoryId}"
+                );
 
                 return RedirectToAction(nameof(Index));
             }
@@ -297,6 +310,13 @@ namespace EventManagementMvc.Controllers
                 return View(editedEvent);
             }
 
+            await _audit.LogAsync(
+                action: "EventUpdated",
+                entityType: "Event",
+                entityId: id,
+                details: $"Name={editedEvent.Name}; CategoryId={editedEvent.CategoryId}; IsActive={editedEvent.IsActive}"
+            );
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -328,6 +348,8 @@ namespace EventManagementMvc.Controllers
             if (!await CanEditEventAsync(@event))
                 return Forbid();
 
+            var name = @event.Name;
+
             var client = _httpClientFactory.CreateClient();
             client.BaseAddress = new Uri($"{Request.Scheme}://{Request.Host}");
 
@@ -350,6 +372,13 @@ namespace EventManagementMvc.Controllers
                 return View("Delete", fullEvent);
             }
 
+            await _audit.LogAsync(
+                action: "EventDeleted",
+                entityType: "Event",
+                entityId: id,
+                details: $"Name={name}"
+            );
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -367,6 +396,13 @@ namespace EventManagementMvc.Controllers
             ev.IsActive = !ev.IsActive;
             await _context.SaveChangesAsync();
 
+            await _audit.LogAsync(
+                action: "EventToggled",
+                entityType: "Event",
+                entityId: id,
+                details: $"IsActive={ev.IsActive}"
+            );
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -375,6 +411,13 @@ namespace EventManagementMvc.Controllers
         {
             var ev = await _context.Events.FindAsync(id);
             if (ev == null) return NotFound();
+
+            await _audit.LogAsync(
+                action: "EventPermissionsViewed",
+                entityType: "Event",
+                entityId: id,
+                details: $"Name={ev.Name}"
+            );
 
             var users = _userManager.Users
                 .OrderBy(u => u.Email)
@@ -424,8 +467,11 @@ namespace EventManagementMvc.Controllers
             var permission = await _context.EventPermissions
                 .FirstOrDefaultAsync(p => p.EventId == vm.EventId && p.UserId == vm.SelectedUserId);
 
+            var created = false;
+
             if (permission == null)
             {
+                created = true;
                 permission = new EventPermission
                 {
                     EventId = vm.EventId,
@@ -442,6 +488,14 @@ namespace EventManagementMvc.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            await _audit.LogAsync(
+                action: "EventPermissionsChanged",
+                entityType: "EventPermission",
+                entityId: null,
+                details: $"EventId={vm.EventId}; UserId={vm.SelectedUserId}; CanView={vm.CanView}; CanEdit={vm.CanEdit}; Created={(created ? "true" : "false")}"
+            );
+
             return RedirectToAction(nameof(Permissions), new { id = vm.EventId });
         }
 

@@ -1,0 +1,53 @@
+﻿@using EventManagementMvc.Areas.Admin.Controllers
+@model List<UsersController.UserRowVm>
+
+@{
+    ViewData["Title"] = "Users";
+    string q = ViewBag.Q ?? "";
+}
+
+<h1>Users</h1>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-md-4">
+        <input name="q" class="form-control" placeholder="Search email/username..." value="@q" />
+    </div>
+    <div class="col-md-8">
+        <button class="btn btn-primary" type="submit">Search</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Reset</a>
+    </div>
+</form>
+
+<table class="table table-striped table-sm">
+    <thead>
+        <tr>
+            <th>Email / Username</th>
+            <th>Roles</th>
+            <th style="width:180px;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var u in Model)
+        {
+            var isAdmin = u.Roles.Contains("Admin");
+            <tr>
+                <td>@u.Email</td>
+                <td>@(u.Roles.Count == 0 ? "-" : string.Join(", ", u.Roles))</td>
+                <td>
+                    <form asp-action="ToggleAdmin" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@u.Id" />
+                        <button type="submit" class="btn btn-sm @(isAdmin ? "btn-outline-danger" : "btn-outline-success")">
+                            @(isAdmin ? "Remove Admin" : "Make Admin")
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

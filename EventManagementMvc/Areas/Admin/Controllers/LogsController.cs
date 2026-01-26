@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace EventManagementMvc.Controllers
+namespace EventManagementMvc.Areas.Admin.Controllers
 {
+    [Area("Admin")]
     [Authorize(Roles = "Admin")]
     public class LogsController : Controller
     {
@@ -15,26 +16,35 @@ namespace EventManagementMvc.Controllers
             _context = context;
         }
 
-        public async Task<IActionResult> Index(int page = 1, int pageSize = 20, string sort = "CreatedAtUtc", string dir = "desc")
+        public async Task<IActionResult> Index(
+            int page = 1,
+            int pageSize = 20,
+            string sort = "CreatedAtUtc",
+            string dir = "desc",
+            string? actionFilter = null,
+            string? userFilter = null,
+            string? entityFilter = null)
         {
             if (page < 1) page = 1;
             if (pageSize < 5) pageSize = 5;
             if (pageSize > 100) pageSize = 100;
 
-            var conn = _context.Database.GetDbConnection();
-            ViewBag.DbName = conn.Database;
-            ViewBag.DbServer = conn.DataSource;
-
             var query = _context.LogEntries.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(actionFilter))
+                query = query.Where(l => l.Action != null && l.Action.Contains(actionFilter));
+
+            if (!string.IsNullOrWhiteSpace(userFilter))
+                query = query.Where(l =>
+                    (l.UserEmail != null && l.UserEmail.Contains(userFilter)) ||
+                    (l.UserId != null && l.UserId.Contains(userFilter)));
+
+            if (!string.IsNullOrWhiteSpace(entityFilter))
+                query = query.Where(l => l.EntityType != null && l.EntityType.Contains(entityFilter));
 
             var total = await query.CountAsync();
 
-            var totalPages = (int)Math.Ceiling(total / (double)pageSize);
-            if (totalPages < 1) totalPages = 1;
-            if (page > totalPages) page = totalPages;
-
             bool isDesc = !string.Equals(dir, "asc", StringComparison.OrdinalIgnoreCase);
-
             query = sort switch
             {
                 "Action" => isDesc ? query.OrderByDescending(l => l.Action) : query.OrderBy(l => l.Action),
@@ -55,34 +65,18 @@ namespace EventManagementMvc.Controllers
             ViewBag.Sort = sort;
             ViewBag.Dir = isDesc ? "desc" : "asc";
 
+            ViewBag.ActionFilter = actionFilter ?? "";
+            ViewBag.UserFilter = userFilter ?? "";
+            ViewBag.EntityFilter = entityFilter ?? "";
+
             return View(items);
         }
-
 
         [HttpGet]
         public async Task<IActionResult> Test()
         {
             var count = await _context.LogEntries.CountAsync();
-
-            var latest = await _context.LogEntries
-                .AsNoTracking()
-                .OrderByDescending(l => l.CreatedAtUtc)
-                .Take(5)
-                .Select(l => new
-                {
-                    l.Id,
-                    l.CreatedAtUtc,
-                    l.Action,
-                    l.UserEmail,
-                    l.UserId,
-                    l.EntityType,
-                    l.EntityId,
-                    l.IpAddress
-                })
-                .ToListAsync();
-
-            return Ok(new { count, latest });
+            return Ok(new { count });
         }
-
     }
 }
