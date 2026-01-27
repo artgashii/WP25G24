@@ -1,0 +1,115 @@
+﻿@model IEnumerable<EventManagementMvc.Models.Ticket>
+
+@{
+    ViewData["Title"] = "My Tickets";
+
+    string BadgeClass(EventManagementMvc.Models.TicketStatus status) => status switch
+    {
+        EventManagementMvc.Models.TicketStatus.Sold => "text-bg-success",
+        EventManagementMvc.Models.TicketStatus.Reserved => "text-bg-warning",
+        EventManagementMvc.Models.TicketStatus.Available => "text-bg-secondary",
+        EventManagementMvc.Models.TicketStatus.Cancelled => "text-bg-danger",
+        _ => "text-bg-secondary"
+    };
+}
+
+<div class="container my-5">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold">My Tickets</h2>
+        <p class="text-muted mb-0">Your purchased tickets in one place.</p>
+    </div>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info text-center shadow-sm">
+            <div class="fw-semibold mb-1">You have no tickets yet.</div>
+            <div class="text-muted">Browse events and buy your first ticket.</div>
+            <div class="mt-3">
+                <a class="btn btn-primary" asp-controller="Events" asp-action="Index">Go to Event Gallery</a>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var t in Model)
+            {
+                var ev = t.Event;
+                var img = (ev != null && !string.IsNullOrWhiteSpace(ev.ImagePath)) ? ev.ImagePath : "/uploads/eventura.png";
+
+                <div class="col-12">
+                    <div class="card shadow-sm overflow-hidden">
+                        <div class="row g-0">
+                            <div class="col-md-4">
+                                <img src="@img"
+                                     class="img-fluid h-100 w-100 object-fit-cover"
+                                     style="min-height:180px; object-fit:cover;"
+                                     alt="Event image" />
+                            </div>
+
+                            <div class="col-md-8">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start gap-3">
+                                        <div>
+                                            <h5 class="card-title mb-1">@((ev?.Name) ?? "Event Name")</h5>
+                                            <div class="text-muted small">
+                                                Ticket #@t.Id
+                                            </div>
+                                        </div>
+
+                                        <span class="badge @BadgeClass(t.Status) align-self-start">
+                                            @t.Status
+                                        </span>
+                                    </div>
+
+                                    <hr class="my-3" />
+
+                                    <div class="row">
+                                        <div class="col-sm-6 mb-2">
+                                            <div class="text-muted small">Date</div>
+                                            <div class="fw-semibold">
+                                                @(ev != null ? ev.Date.ToString("MMM dd, yyyy HH:mm") : "Unknown")
+                                            </div>
+                                        </div>
+
+                                        <div class="col-sm-6 mb-2">
+                                            <div class="text-muted small">Location</div>
+                                            <div class="fw-semibold">
+                                                @((ev?.Location) ?? "Unknown")
+                                            </div>
+                                        </div>
+
+                                        <div class="col-sm-6 mb-2">
+                                            <div class="text-muted small">Price</div>
+                                            <div class="fw-semibold">$@t.Price</div>
+                                        </div>
+
+                                        <div class="col-sm-6 mb-2">
+                                            <div class="text-muted small">Status</div>
+                                            <div class="fw-semibold">@t.Status</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex gap-2 mt-3">
+                                        @if (ev != null)
+                                        {
+                                            <a class="btn btn-outline-primary"
+                                               asp-controller="Events" asp-action="Details" asp-route-id="@ev.Id">
+                                                View Event
+                                            </a>
+                                        }
+
+                                        <a class="btn btn-outline-secondary"
+                                           asp-controller="Events" asp-action="Index">
+                                            Browse More Events
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

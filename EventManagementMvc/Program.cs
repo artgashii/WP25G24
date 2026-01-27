@@ -21,7 +21,6 @@ builder.Services.AddDefaultIdentity<EventManagementMvcUser>(options =>
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
-// ✅ JWT configuration
 var jwtKey = builder.Configuration["Jwt:Key"]!;
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
 var jwtAudience = builder.Configuration["Jwt:Audience"]!;
@@ -57,6 +56,8 @@ builder.Services.AddTransient<Microsoft.AspNetCore.Authentication.IClaimsTransfo
 builder.Services.AddScoped<EventManagementMvc.Services.IAuditLogger, EventManagementMvc.Services.AuditLogger>();
 
 var app = builder.Build();
+
+await EventManagementMvc.Data.IdentitySeeder.SeedRolesAsync(app.Services);
 
 if (app.Environment.IsDevelopment())
 {

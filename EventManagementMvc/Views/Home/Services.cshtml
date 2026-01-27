@@ -1,0 +1,100 @@
+﻿@{
+    ViewData["Title"] = "Services";
+}
+
+<section class="py-5 bg-light rounded-3">
+    <div class="container text-center">
+        <h2 class="fw-bold">Our Services</h2>
+        <p class="text-muted">We craft memories for you</p>
+
+        <div class="row mt-4 g-4">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="fs-1 mb-3">🎉</div>
+                        <h5 class="card-title">Event Planning</h5>
+                        <p class="card-text text-muted">
+                            From concept to execution — we plan timelines, manage vendors, and coordinate every detail.
+                        </p>
+                        <a class="btn btn-link p-0 text-decoration-none" asp-controller="Events" asp-action="Index">
+                            See Events &gt;
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="fs-1 mb-3">🎟️</div>
+                        <h5 class="card-title">Ticketing & Attendees</h5>
+                        <p class="card-text text-muted">
+                            Simple attendee registration and ticket management so you can focus on the experience.
+                        </p>
+                        <a class="btn btn-link p-0 text-decoration-none" asp-controller="Tickets" asp-action="Index">
+                            Explore Tickets &gt;
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="fs-1 mb-3">📸</div>
+                        <h5 class="card-title">Photography & Media</h5>
+                        <p class="card-text text-muted">
+                            Capture moments that matter with professional photo/video coverage and social highlights.
+                        </p>
+                        <a class="btn btn-link p-0 text-decoration-none" asp-controller="Home" asp-action="AboutUs">
+                            Learn More &gt;
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4 g-4">
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="fs-1 mb-3">🍽️</div>
+                        <h5 class="card-title">Catering</h5>
+                        <p class="card-text text-muted">
+                            Menus designed for your guests — from casual buffet to premium dining experiences.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="fs-1 mb-3">🎨</div>
+                        <h5 class="card-title">Design & Decoration</h5>
+                        <p class="card-text text-muted">
+                            Themes, décor, and styling that bring your vision to life.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <div class="fs-1 mb-3">🧑‍💼</div>
+                        <h5 class="card-title">On-Site Coordination</h5>
+                        <p class="card-text text-muted">
+                            On-the-day coordination so everything runs smoothly and on schedule.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-5">
+            <a class="btn btn-primary" asp-controller="Events" asp-action="Index">Browse Event Gallery</a>
+            <a class="btn btn-outline-secondary ms-2" asp-controller="Home" asp-action="AboutUs">About Eventura</a>
+        </div>
+    </div>
+</section>

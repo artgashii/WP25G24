@@ -1,0 +1,145 @@
+﻿@using Microsoft.AspNetCore.Mvc.Rendering
+@model EventManagementMvc.Models.Ticket
+
+@{
+    ViewData["Title"] = "Admin - Tickets";
+
+    var editingId = ViewBag.EditingId as int?;
+    var tickets = ViewBag.Tickets as List<EventManagementMvc.Models.Ticket> ?? new();
+
+    var eventsList = ViewBag.Events as SelectList ?? new SelectList(Enumerable.Empty<SelectListItem>());
+    var usersList = ViewBag.Users as SelectList ?? new SelectList(Enumerable.Empty<SelectListItem>());
+
+    int currentPage = ViewBag.Page ?? 1;
+    int pageSize = ViewBag.PageSize ?? 10;
+    int total = ViewBag.Total ?? 0;
+    int totalPages = (int)Math.Ceiling(total / (double)pageSize);
+    if (totalPages < 1) totalPages = 1;
+}
+
+<div class="container mt-4">
+    <h2>Tickets Management</h2>
+
+    <div asp-validation-summary="All" class="alert alert-danger"></div>
+
+    @if (tickets.Count == 0)
+    {
+        <div class="alert alert-info">
+            No tickets found.
+        </div>
+    }
+    else
+    {
+        <ul class="list-group mb-4">
+            @foreach (var ticket in tickets)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>ID:</strong> @ticket.Id |
+                        <strong>Event:</strong> @((ticket.Event?.Name) ?? ticket.EventId.ToString()) |
+                        <strong>User:</strong> @(ticket.PurchasedByUserId ?? "-") |
+                        <strong>Price:</strong> @ticket.Price |
+                        <strong>Status:</strong> @ticket.Status
+                    </div>
+                    <div>
+                        <a class="btn btn-sm btn-primary me-2"
+                           asp-action="Index" asp-route-editingId="@ticket.Id">
+                            Edit
+                        </a>
+
+                        <form asp-action="Delete" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@ticket.Id" />
+                            <button class="btn btn-sm btn-danger" type="submit"
+                                    onclick="return confirm('Delete this ticket?');">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
+                </li>
+            }
+        </ul>
+
+        <nav aria-label="Tickets pagination">
+            <ul class="pagination justify-content-center">
+                <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+                    <a class="page-link"
+                       asp-action="Index"
+                       asp-route-page="@(currentPage - 1)"
+                       asp-route-pageSize="@pageSize"
+                       asp-route-editingId="@(editingId ?? (int?)null)">
+                        Previous
+                    </a>
+                </li>
+
+                <li class="page-item disabled">
+                    <span class="page-link">Page @currentPage / @totalPages</span>
+                </li>
+
+                <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                    <a class="page-link"
+                       asp-action="Index"
+                       asp-route-page="@(currentPage + 1)"
+                       asp-route-pageSize="@pageSize"
+                       asp-route-editingId="@(editingId ?? (int?)null)">
+                        Next
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    }
+
+    <div class="card p-3 shadow-sm">
+        <h4>@(editingId.HasValue ? "Edit Ticket" : "Create Ticket")</h4>
+
+        <form asp-action="Save" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="IsActive" />
+
+            <div class="mb-3">
+                <label asp-for="EventId" class="form-label">Event</label>
+                <select asp-for="EventId" class="form-select" asp-items="eventsList" required>
+                    <option value="">Select event</option>
+                </select>
+                <span asp-validation-for="EventId" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">User</label>
+                <select class="form-select" asp-for="PurchasedByUserId" asp-items="usersList">
+                    <option value="">(No user)</option>
+                </select>
+                <span asp-validation-for="PurchasedByUserId" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Price" class="form-label">Price</label>
+                <input asp-for="Price" type="number" class="form-control" required min="0" step="0.01" />
+                <span asp-validation-for="Price" class="text-danger"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Status" class="form-label">Status</label>
+                <select asp-for="Status" class="form-select">
+                    <option value="@EventManagementMvc.Models.TicketStatus.Available">Available</option>
+                    <option value="@EventManagementMvc.Models.TicketStatus.Reserved">Reserved</option>
+                    <option value="@EventManagementMvc.Models.TicketStatus.Sold">Sold</option>
+                    <option value="@EventManagementMvc.Models.TicketStatus.Cancelled">Cancelled</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-success me-2">
+                @(editingId.HasValue ? "Update" : "Create")
+            </button>
+
+            <a class="btn btn-secondary" asp-action="CancelEdit">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

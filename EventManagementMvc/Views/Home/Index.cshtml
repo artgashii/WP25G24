@@ -48,7 +48,7 @@
         <div class="d-flex justify-content-center gap-3 mt-4">
             @if (User.Identity?.IsAuthenticated ?? false)
             {
-                <a class="btn btn-primary" asp-controller="Events" asp-action="Create">Book Your Event</a>
+                <a class="btn btn-primary" asp-controller="Events" asp-action="Index">Book Your Event</a>
             }
             else
             {

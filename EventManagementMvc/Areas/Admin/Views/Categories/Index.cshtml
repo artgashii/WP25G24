@@ -1,0 +1,110 @@
+﻿@model EventManagementMvc.Models.Category
+@{
+    ViewData["Title"] = "Admin - Categories";
+
+    var editingId = ViewBag.EditingId as int?;
+    var categories = ViewBag.Categories as List<EventManagementMvc.Models.Category> ?? new();
+
+    int currentPage = ViewBag.Page ?? 1;
+    int pageSize = ViewBag.PageSize ?? 10;
+    int total = ViewBag.Total ?? 0;
+    int totalPages = (int)Math.Ceiling(total / (double)pageSize);
+    if (totalPages < 1) totalPages = 1;
+}
+
+<div class="container mt-4">
+    <h2 class="mb-3">Manage Categories</h2>
+
+    <div asp-validation-summary="All" class="alert alert-danger" role="alert"></div>
+
+    <form asp-action="Save" method="post" class="mb-4">
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" asp-for="Id" />
+        <input type="hidden" asp-for="IsActive" />
+
+        <div class="mb-3">
+            <label asp-for="Name" class="form-label">Category Name</label>
+            <input asp-for="Name" class="form-control" required />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary me-2">
+            @(editingId.HasValue ? "Update" : "Create")
+        </button>
+
+        @if (editingId.HasValue)
+        {
+            <a class="btn btn-secondary" asp-action="CancelEdit">Cancel</a>
+        }
+    </form>
+
+    <table class="table table-bordered table-striped">
+        <thead class="table-light">
+            <tr>
+                <th style="width: 80px;">ID</th>
+                <th>Name</th>
+                <th style="width: 180px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var cat in categories)
+            {
+                <tr>
+                    <td>@cat.Id</td>
+                    <td>@cat.Name</td>
+                    <td>
+                        <a class="btn btn-sm btn-info me-2"
+                           asp-action="Index" asp-route-editingId="@cat.Id">
+                            Edit
+                        </a>
+
+                        <form asp-action="Delete" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@cat.Id" />
+                            <button class="btn btn-sm btn-danger" type="submit"
+                                    onclick="return confirm('Delete this category?');">
+                                Delete
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <nav aria-label="Categories pagination">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(currentPage <= 1 ? "disabled" : "")">
+                <a class="page-link"
+                   asp-action="Index"
+                   asp-route-page="@(currentPage - 1)"
+                   asp-route-pageSize="@pageSize"
+                   asp-route-editingId="@(editingId ?? (int?)null)">
+                    Previous
+                </a>
+            </li>
+
+            <li class="page-item disabled">
+                <span class="page-link">Page @currentPage / @totalPages</span>
+            </li>
+
+            <li class="page-item @(currentPage >= totalPages ? "disabled" : "")">
+                <a class="page-link"
+                   asp-action="Index"
+                   asp-route-page="@(currentPage + 1)"
+                   asp-route-pageSize="@pageSize"
+                   asp-route-editingId="@(editingId ?? (int?)null)">
+                    Next
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

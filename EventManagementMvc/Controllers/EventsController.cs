@@ -55,7 +55,22 @@ namespace EventManagementMvc.Controllers
                 .Include(e => e.Category);
 
             if (!isAdmin)
-                query = query.Where(e => e.IsActive);
+            {
+                if (User.Identity?.IsAuthenticated ?? false)
+                {
+                    var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+                    query = query.Where(e =>
+                        e.IsActive
+                        || e.CreatedByUserId == userId
+                        || _context.EventPermissions.Any(p => p.EventId == e.Id && p.UserId == userId && p.CanView));
+                }
+                else
+                {
+                    query = query.Where(e => e.IsActive);
+                }
+            }
+
 
             if (!string.IsNullOrWhiteSpace(q))
                 query = query.Where(e => e.Name.Contains(q) || (e.Description != null && e.Description.Contains(q)));
@@ -125,9 +140,6 @@ namespace EventManagementMvc.Controllers
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (@event == null) return NotFound();
-
-            if (!@event.IsActive && !User.IsInRole("Admin"))
-                return NotFound();
 
             if (!await CanViewEventAsync(@event))
                 return Forbid();

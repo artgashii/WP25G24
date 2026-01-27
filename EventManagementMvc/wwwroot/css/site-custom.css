@@ -28,3 +28,25 @@
     object-fit: cover;
     height: 200px;
 }
+
+.sidebar .sidebar-link {
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.25rem;
+    color: #fff;
+    opacity: 0.95;
+}
+
+    .sidebar .sidebar-link:hover {
+        background: rgba(255, 255, 255, 0.12);
+        opacity: 1;
+    }
+
+.sidebar .nav-link.active {
+    background: rgba(255, 255, 255, 0.18);
+    font-weight: 600;
+}
+
+.object-fit-cover {
+    object-fit: cover;
+}

@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace EventManagementMvc.Views.Shared
+namespace EventManagementMvc.Areas.Admin.Views.Categories
 {
-    public class _NavModel : PageModel
+    public class IndexModel : PageModel
     {
         public void OnGet()
         {

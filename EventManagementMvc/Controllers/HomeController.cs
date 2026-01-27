@@ -63,5 +63,10 @@ namespace EventManagementMvc.Controllers
         {
             return View();
         }
+        public IActionResult Services()
+        {
+            return View();
+        }
+
     }
 }

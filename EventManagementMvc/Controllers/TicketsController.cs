@@ -5,6 +5,8 @@ using EventManagementMvc.Data;
 using EventManagementMvc.Models;
 using Microsoft.AspNetCore.Authorization;
 using EventManagementMvc.Services;
+using System.Security.Claims;
+
 
 namespace EventManagementMvc.Controllers
 {
@@ -19,84 +21,18 @@ namespace EventManagementMvc.Controllers
             _audit = audit;
         }
 
-        public async Task<IActionResult> Index(
-            int page = 1,
-            int pageSize = 10,
-            int? eventId = null,
-            bool? activeOnly = null,
-            string sort = "Id",
-            string dir = "asc")
+        public IActionResult Index()
         {
-            if (page < 1) page = 1;
-            if (pageSize < 5) pageSize = 5;
-            if (pageSize > 50) pageSize = 50;
 
-            IQueryable<Ticket> query = _context.Tickets
-                .Include(t => t.Event);
+            if (User.IsInRole("Admin"))
+                return RedirectToAction("Index", "Tickets", new { area = "Admin" });
 
-            if (!User.IsInRole("Admin"))
-            {
-                query = query.Where(t => t.IsActive);
-            }
-            else
-            {
-                if (activeOnly.HasValue && activeOnly.Value)
-                    query = query.Where(t => t.IsActive);
-            }
+            if (User.Identity?.IsAuthenticated ?? false)
+                return RedirectToAction(nameof(MyTickets));
 
-            if (eventId.HasValue && eventId.Value > 0)
-                query = query.Where(t => t.EventId == eventId.Value);
-
-            bool asc = dir.Equals("asc", StringComparison.OrdinalIgnoreCase);
-            query = (sort, asc) switch
-            {
-                ("Price", true) => query.OrderBy(t => t.Price),
-                ("Price", false) => query.OrderByDescending(t => t.Price),
-
-                ("Status", true) => query.OrderBy(t => t.Status),
-                ("Status", false) => query.OrderByDescending(t => t.Status),
-
-                ("Event", true) => query.OrderBy(t => t.Event!.Name),
-                ("Event", false) => query.OrderByDescending(t => t.Event!.Name),
-
-                ("IsActive", true) => query.OrderBy(t => t.IsActive),
-                ("IsActive", false) => query.OrderByDescending(t => t.IsActive),
-
-                ("Id", false) => query.OrderByDescending(t => t.Id),
-                _ => query.OrderBy(t => t.Id)
-            };
-
-            var total = await query.CountAsync();
-
-            var items = await query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            ViewBag.Events = await _context.Events
-                .AsNoTracking()
-                .OrderBy(e => e.Name)
-                .ToListAsync();
-
-            ViewBag.Page = page;
-            ViewBag.PageSize = pageSize;
-            ViewBag.Total = total;
-            ViewBag.EventId = eventId ?? 0;
-
-            ViewBag.ActiveOnly = User.IsInRole("Admin") ? (activeOnly ?? false) : true;
-
-            ViewBag.Sort = sort;
-            ViewBag.Dir = dir;
-
-            await _audit.LogAsync(
-                action: "TicketsListed",
-                entityType: "Ticket",
-                entityId: null,
-                details: $"Page={page}; PageSize={pageSize}; EventId={(eventId ?? 0)}; ActiveOnly={(User.IsInRole("Admin") ? (activeOnly ?? false) : true)}; Sort={sort}; Dir={dir}; Total={total}"
-            );
-
-            return View(items);
+            return RedirectToAction("Index", "Events");
         }
+
 
         public async Task<IActionResult> Details(int? id)
         {
@@ -296,6 +232,81 @@ namespace EventManagementMvc.Controllers
             );
 
             return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize]
+        public async Task<IActionResult> Buy(int eventId)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Challenge();
+
+            var ev = await _context.Events.AsNoTracking().FirstOrDefaultAsync(e => e.Id == eventId);
+            if (ev == null)
+            {
+                TempData["TicketError"] = "Event not found.";
+                return RedirectToAction("Index", "Events");
+            }
+
+            if (!User.IsInRole("Admin") && !ev.IsActive)
+            {
+                TempData["TicketError"] = "This event is not available.";
+                return RedirectToAction("Details", "Events", new { id = eventId });
+            }
+
+            bool alreadyBought = await _context.Tickets.AnyAsync(t =>
+                t.EventId == eventId &&
+                t.PurchasedByUserId == userId &&
+                t.IsActive &&
+                (t.Status == TicketStatus.Sold || t.Status == TicketStatus.Reserved));
+
+            if (alreadyBought)
+            {
+                TempData["TicketError"] = "You already purchased a ticket for this event.";
+                return RedirectToAction("Details", "Events", new { id = eventId });
+            }
+
+            var ticket = new Ticket
+            {
+                EventId = eventId,
+                Price = 10.00m,
+                Status = TicketStatus.Sold,
+                PurchasedByUserId = userId,
+                IsActive = true
+            };
+
+            _context.Tickets.Add(ticket);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                TempData["TicketSuccess"] = "Ticket successfully purchased!";
+            }
+            catch
+            {
+                TempData["TicketError"] = "Failed to purchase ticket. Please try again.";
+            }
+
+            return RedirectToAction("Details", "Events", new { id = eventId });
+        }
+
+        [Authorize]
+        public async Task<IActionResult> MyTickets()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+                return Challenge();
+
+            var tickets = await _context.Tickets
+                .Include(t => t.Event)
+                .AsNoTracking()
+                .Where(t => t.PurchasedByUserId == userId && t.IsActive)
+                .OrderByDescending(t => t.Id)
+                .ToListAsync();
+
+            return View(tickets);
         }
     }
 }
